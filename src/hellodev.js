@@ -5,6 +5,10 @@ import { createWidget } from './widgets/index.js';
 const STORAGE_KEY = 'hellodev-widgets';
 const THEME_STORAGE_KEY = 'hellodev-theme';
 
+// Version number for saved widget state. Increment this when the saved state format
+// changes in an incompatible manner that would break loading of previously saved data.
+const STORAGE_VERSION = 1;
+
 // Grid cell size in pixels
 const GRID_CELL_SIZE = 160;
 
@@ -30,7 +34,6 @@ const DEFAULT_WIDGETS = [
 let widgets = [];
 let editMode = false;
 let lightMode = false;
-let clockInterval = null;
 
 // DOM elements
 const dashboard = document.getElementById('dashboard');
@@ -58,7 +61,21 @@ function loadWidgets() {
 
   if (stored) {
     try {
-      configs = JSON.parse(stored);
+      const parsed = JSON.parse(stored);
+      // Check if stored data has version info (new format)
+      if (parsed && typeof parsed === 'object' && 'version' in parsed) {
+        // Verify compatible version
+        if (parsed.version === STORAGE_VERSION) {
+          configs = parsed.widgets || [];
+        } else {
+          // Incompatible version - use defaults
+          console.warn(`Incompatible saved state version ${parsed.version}, expected ${STORAGE_VERSION}. Using defaults.`);
+          configs = [...DEFAULT_WIDGETS];
+        }
+      } else {
+        // Legacy format (array without version) - use defaults
+        configs = [...DEFAULT_WIDGETS];
+      }
     } catch (e) {
       configs = [...DEFAULT_WIDGETS];
     }
@@ -80,7 +97,11 @@ function loadWidgets() {
 // Save widgets to storage
 function saveWidgets() {
   const configs = widgets.map(w => w.toJSON());
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(configs));
+  const state = {
+    version: STORAGE_VERSION,
+    widgets: configs
+  };
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
 // ============================================================================
@@ -574,12 +595,10 @@ document.addEventListener('click', (e) => {
     const fieldKey = e.target.dataset.field;
     const listContainer = e.target.closest('.widget-config-list');
     const itemsContainer = listContainer.querySelector('.widget-config-list-items');
-    const widget = widgets.find(w => w.id === document.querySelector('.widget-config-dialog')?.dataset.widgetId);
     
     // Find the field schema
     const overlay = document.querySelector('.widget-config-overlay');
     if (overlay) {
-      const widgetId = overlay.querySelector('.widget-config-dialog').dataset?.widgetId;
       // Get field info from existing items
       const existingItems = itemsContainer.querySelectorAll('.widget-config-list-item');
       const newIndex = existingItems.length;
@@ -626,7 +645,7 @@ document.addEventListener('click', (e) => {
 // Clock functionality
 function startClock() {
   updateClock();
-  clockInterval = setInterval(updateClock, 1000);
+  setInterval(updateClock, 1000);
 }
 
 function updateClock() {
