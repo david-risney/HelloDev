@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HelloDev</title>
+  <link rel="stylesheet" href="hellodev.css">
+</head>
+<body>
+  <header class="header">
+    <h1 class="logo">HelloDev</h1>
+    <div class="header-controls">
+      <button class="header-btn" id="themeToggle" title="Toggle light/dark mode">
+        <span class="theme-icon">☾</span>
+      </button>
+      <button class="header-btn" id="editToggle" title="Edit">
+        <span class="edit-icon">⚙</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="widget-panel" id="widgetPanel">
+    <div class="widget-panel-section">
+      <h2>Add Widget</h2>
+      <div class="widget-options">
+        <button class="widget-option" data-widget="clock">🕐 Clock</button>
+        <button class="widget-option" data-widget="greeting">👋 Greeting</button>
+        <button class="widget-option" data-widget="search">🔍 Search</button>
+        <button class="widget-option" data-widget="notes">📝 Notes</button>
+        <button class="widget-option" data-widget="links">🔗 Quick Links</button>
+        <button class="widget-option" data-widget="markdown">📄 Markdown</button>
+      </div>
+    </div>
+    <div class="widget-panel-section theme-section">
+      <h2>Theme Colors</h2>
+      <div class="theme-colors">
+        <label class="theme-color-picker">
+          <span>Primary</span>
+          <input type="color" id="colorPrimary" value="#1a1a2e">
+        </label>
+        <label class="theme-color-picker">
+          <span>Accent</span>
+          <input type="color" id="colorAccent" value="#667eea">
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <main class="dashboard" id="dashboard">
+    <!-- Widgets are rendered here -->
+  </main>
+
+  <script type="module" src="hellodev.js"></script>
+</body>
+</html>
