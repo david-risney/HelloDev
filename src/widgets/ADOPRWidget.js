@@ -33,6 +33,7 @@ export class ADOPRWidget extends WidgetBase {
     this.data.reviewerEmail ??= '';
     this.data.targetBranch ??= '';
     this.data.titleText ??= '';
+    this.data.title ??= '';
     
     // Cache for resolved user IDs
     this._userIdCache = {};
@@ -141,6 +142,12 @@ export class ADOPRWidget extends WidgetBase {
         label: 'Title Contains (optional)',
         type: 'string',
         default: ''
+      },
+      {
+        key: 'title',
+        label: 'Widget Title (optional)',
+        type: 'string',
+        default: ''
       }
     ];
   }
@@ -206,9 +213,14 @@ export class ADOPRWidget extends WidgetBase {
       ? new Date(this.lastFetched).toLocaleTimeString()
       : '';
 
+    const displayTitle = this.escapeHtml(this.data.title || 'Pull Requests');
+    const titleHtml = this.data.repository
+      ? `<a href="${this.getPRListUrl()}" target="_blank" class="widget-adopr-title-link">${displayTitle}</a>`
+      : `<span class="widget-adopr-title">${displayTitle}</span>`;
+
     return `
       <div class="widget-adopr-header">
-        <span class="widget-adopr-title">Pull Requests</span>
+        ${titleHtml}
         <span class="widget-adopr-last-updated" title="Last updated">${lastFetchedStr}</span>
         <button class="widget-adopr-refresh" title="Reload">⟳</button>
       </div>
@@ -218,25 +230,75 @@ export class ADOPRWidget extends WidgetBase {
     `;
   }
 
+  getPRListUrl() {
+    const org = encodeURIComponent(this.data.organization);
+    const project = encodeURIComponent(this.data.project);
+    return `https://dev.azure.com/${org}/${project}/_git/${encodeURIComponent(this.data.repository)}/pullrequests`;
+  }
+
   renderPR(pr) {
     const statusClass = this.getStatusClass(pr.status);
     const reviewerStatus = this.getReviewerStatusIcon(pr);
+    const age = this.formatAge(pr.creationDate);
+    const creator = this.escapeHtml(pr.createdBy?.displayName || 'Unknown');
+    const avatarUrl = pr.createdBy?.imageUrl;
+    const initials = this.getInitials(pr.createdBy?.displayName || '?');
+    
+    const avatarHtml = avatarUrl
+      ? `<img class="widget-adopr-avatar" src="${this.escapeHtml(avatarUrl)}" alt="${creator}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span class="widget-adopr-avatar-initials" style="display:none">${initials}</span>`
+      : `<span class="widget-adopr-avatar-initials">${initials}</span>`;
     
     return `
       <li class="widget-adopr-item ${statusClass}">
         <a href="${pr.url}" target="_blank" class="widget-adopr-link">
-          <div class="widget-adopr-pr-header">
-            <span class="widget-adopr-pr-id">#${pr.pullRequestId}</span>
-            <span class="widget-adopr-pr-status">${reviewerStatus}</span>
+          <div class="widget-adopr-avatar-container">
+            ${avatarHtml}
           </div>
-          <div class="widget-adopr-pr-title">${this.escapeHtml(pr.title)}</div>
-          <div class="widget-adopr-pr-meta">
-            <span class="widget-adopr-pr-author">${this.escapeHtml(pr.createdBy?.displayName || 'Unknown')}</span>
-            <span class="widget-adopr-pr-repo">${this.escapeHtml(pr.repository?.name || '')}</span>
+          <div class="widget-adopr-pr-content">
+            <div class="widget-adopr-pr-line1">
+              <span class="widget-adopr-pr-title">${this.escapeHtml(pr.title)}</span>
+              <span class="widget-adopr-pr-status">${reviewerStatus}</span>
+            </div>
+            <div class="widget-adopr-pr-line2">
+              <span class="widget-adopr-pr-id">#${pr.pullRequestId}</span>
+              <span class="widget-adopr-pr-author">${creator}</span>
+              <span class="widget-adopr-pr-age">${age}</span>
+            </div>
           </div>
         </a>
       </li>
     `;
+  }
+
+  getInitials(name) {
+    if (!name) return '?';
+    const parts = name.trim().split(/\s+/);
+    if (parts.length === 1) {
+      return parts[0].substring(0, 2).toUpperCase();
+    }
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }
+
+  formatAge(dateString) {
+    if (!dateString) return '';
+    
+    const created = new Date(dateString);
+    const now = new Date();
+    const diffMs = now - created;
+    
+    const seconds = Math.floor(diffMs / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+    const months = Math.floor(days / 30);
+    const years = Math.floor(days / 365);
+    
+    if (years > 0) return `${years} year${years > 1 ? 's' : ''} ago`;
+    if (months > 0) return `${months} month${months > 1 ? 's' : ''} ago`;
+    if (days > 0) return `${days} day${days > 1 ? 's' : ''} ago`;
+    if (hours > 0) return `${hours} hour${hours > 1 ? 's' : ''} ago`;
+    if (minutes > 0) return `${minutes} minute${minutes > 1 ? 's' : ''} ago`;
+    return 'just now';
   }
 
   getStatusClass(status) {

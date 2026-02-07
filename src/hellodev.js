@@ -582,14 +582,32 @@ function findNextPosition() {
 function addWidget(type) {
   const id = `widget-${Date.now()}`;
   const pos = findNextPosition();
+  
+  // Check if there's an existing widget of the same type to copy properties from
+  const existingWidget = widgets.find(w => w.type === type);
+  
+  // Copy size from existing widget, or use default size from widget class
+  let width, height, data;
+  if (existingWidget) {
+    width = existingWidget.width;
+    height = existingWidget.height;
+    data = structuredClone(existingWidget.data);
+  } else {
+    const WidgetClass = WidgetRegistry[type];
+    const defaultSize = WidgetClass?.metadata?.defaultSize || { width: 2, height: 2 };
+    width = defaultSize.width;
+    height = defaultSize.height;
+    data = {};
+  }
+  
   const config = {
     id,
     type,
     x: pos.x,
     y: pos.y,
-    width: 1,
-    height: 1,
-    data: {}
+    width,
+    height,
+    data
   };
   const newWidget = createWidget(config);
   // Inject saveWidgets callback for widgets that need it
