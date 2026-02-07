@@ -1,0 +1,4 @@
+# Generated native host files (contain machine-specific paths)
+# These are created by install.ps1 or install.sh
+native-host/com.hellodev.ado.json
+native-host/ado_token_host.bat

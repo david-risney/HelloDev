@@ -3,6 +3,9 @@
   "name": "HelloDev",
   "version": "1.0.0",
   "description": "A simple custom new tab page extension",
+  "permissions": [
+    "nativeMessaging"
+  ],
   "action": {
     "default_title": "HelloDev",
     "default_icon": {

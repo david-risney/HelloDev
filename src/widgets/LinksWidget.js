@@ -4,6 +4,11 @@ import { WidgetBase } from './WidgetBase.js';
  * Links widget - quick links list
  */
 export class LinksWidget extends WidgetBase {
+  static metadata = {
+    name: 'Quick Links',
+    icon: '🔗'
+  };
+
   constructor(config) {
     super({ ...config, type: 'links' });
     if (!this.data.links) {

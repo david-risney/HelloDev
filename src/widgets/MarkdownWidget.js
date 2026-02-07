@@ -4,6 +4,11 @@ import { WidgetBase } from './WidgetBase.js';
  * Markdown widget - displays rendered markdown content
  */
 export class MarkdownWidget extends WidgetBase {
+  static metadata = {
+    name: 'Markdown',
+    icon: '📄'
+  };
+
   constructor(config) {
     super({ ...config, type: 'markdown' });
     if (!this.data.markdown) {

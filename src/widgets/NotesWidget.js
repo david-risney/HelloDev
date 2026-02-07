@@ -4,6 +4,11 @@ import { WidgetBase } from './WidgetBase.js';
  * Notes widget - quick notes textarea
  */
 export class NotesWidget extends WidgetBase {
+  static metadata = {
+    name: 'Notes',
+    icon: '📝'
+  };
+
   constructor(config) {
     super({ ...config, type: 'notes' });
     this.saveWidgets = null; // Will be set by the dashboard

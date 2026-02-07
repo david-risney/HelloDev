@@ -4,6 +4,11 @@ import { WidgetBase } from './WidgetBase.js';
  * Search widget - web search input
  */
 export class SearchWidget extends WidgetBase {
+  static metadata = {
+    name: 'Search',
+    icon: '🔍'
+  };
+
   static DEFAULT_URL_TEMPLATE = 'https://www.google.com/search?q={query}';
 
   constructor(config) {

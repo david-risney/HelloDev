@@ -1,6 +1,6 @@
 // HelloDev Dashboard
 
-import { createWidget } from './widgets/index.js';
+import { createWidget, WidgetRegistry } from './widgets/index.js';
 
 const STORAGE_KEY = 'hellodev-widgets';
 const THEME_STORAGE_KEY = 'hellodev-theme';
@@ -25,15 +25,15 @@ const DEFAULT_THEME = {
 
 // Default widget configurations
 const DEFAULT_WIDGETS = [
-  { id: 'widget-1', type: 'greeting', x: 0, y: 0, width: 2, height: 1 },
-  { id: 'widget-2', type: 'clock', x: 2, y: 0, width: 1, height: 1 },
-  { id: 'widget-3', type: 'search', x: 0, y: 1, width: 2, height: 1 }
+  { id: 'widget-1', type: 'clock', x: 0, y: 0, width: 2, height: 1 },
+  { id: 'widget-2', type: 'search', x: 2, y: 0, width: 2, height: 1 }
 ];
 
 // State
 let widgets = [];
 let editMode = false;
 let lightMode = false;
+let draggingWidget = null;
 
 // DOM elements
 const dashboard = document.getElementById('dashboard');
@@ -51,7 +51,6 @@ function init() {
   setupEventListeners();
   setupDashboardDragDrop();
   setupThemeControls();
-  startClock();
 }
 
 // Load widgets from storage
@@ -193,13 +192,19 @@ function setupEventListeners() {
   // Edit mode toggle
   editToggle.addEventListener('click', toggleEditMode);
 
-  // Widget panel - add widget buttons
-  widgetPanel.querySelectorAll('.widget-option').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const type = btn.dataset.widget;
-      addWidget(type);
-    });
-  });
+  // Dynamically generate widget buttons from registry
+  const widgetOptionsContainer = widgetPanel.querySelector('.widget-options');
+  widgetOptionsContainer.innerHTML = '';
+  
+  for (const [type, WidgetClass] of Object.entries(WidgetRegistry)) {
+    const { name, icon } = WidgetClass.metadata;
+    const btn = document.createElement('button');
+    btn.className = 'widget-option';
+    btn.dataset.widget = type;
+    btn.textContent = `${icon} ${name}`;
+    btn.addEventListener('click', () => addWidget(type));
+    widgetOptionsContainer.appendChild(btn);
+  }
 }
 
 // Toggle edit mode
@@ -230,9 +235,6 @@ function renderDashboard() {
     const el = widget.createElement(removeWidget, resizeWidget, openWidgetConfig);
     dashboard.appendChild(el);
   });
-
-  // Trigger initial tick for widgets that need it
-  widgets.forEach(widget => widget.onTick());
 }
 
 // Setup drag and drop on the dashboard
@@ -242,15 +244,26 @@ function setupDashboardDragDrop() {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
     
-    // Show drop indicator
+    // Track which widget is being dragged
+    if (!draggingWidget) {
+      const draggingEl = dashboard.querySelector('.widget.dragging');
+      if (draggingEl) {
+        draggingWidget = widgets.find(w => w.id === draggingEl.dataset.id);
+      }
+    }
+    
+    // Show drop indicator with widget dimensions
     const pos = getGridPositionFromEvent(e);
-    updateDropIndicator(pos.x, pos.y);
+    const width = draggingWidget?.width ?? 1;
+    const height = draggingWidget?.height ?? 1;
+    updateDropIndicator(pos.x, pos.y, width, height);
   });
 
   dashboard.addEventListener('dragleave', (e) => {
     // Only remove indicator if leaving the dashboard entirely
     if (!dashboard.contains(e.relatedTarget)) {
       removeDropIndicator();
+      draggingWidget = null;
     }
   });
 
@@ -258,6 +271,7 @@ function setupDashboardDragDrop() {
     if (!editMode) return;
     e.preventDefault();
     removeDropIndicator();
+    draggingWidget = null;
     
     const widgetId = e.dataTransfer.getData('text/plain');
     const pos = getGridPositionFromEvent(e);
@@ -281,16 +295,16 @@ function getGridPositionFromEvent(e) {
   return { x, y };
 }
 
-// Show drop indicator at grid position
-function updateDropIndicator(x, y) {
+// Show drop indicator at grid position with widget dimensions
+function updateDropIndicator(x, y, width = 1, height = 1) {
   let indicator = dashboard.querySelector('.drop-indicator');
   if (!indicator) {
     indicator = document.createElement('div');
     indicator.className = 'drop-indicator';
     dashboard.appendChild(indicator);
   }
-  indicator.style.gridColumn = `${x + 1} / span 1`;
-  indicator.style.gridRow = `${y + 1} / span 1`;
+  indicator.style.gridColumn = `${x + 1} / span ${width}`;
+  indicator.style.gridRow = `${y + 1} / span ${height}`;
 }
 
 // Remove drop indicator
@@ -348,6 +362,10 @@ function addWidget(type) {
 
 // Remove a widget
 function removeWidget(id) {
+  const widget = widgets.find(w => w.id === id);
+  if (widget && widget.destroy) {
+    widget.destroy();
+  }
   widgets = widgets.filter(w => w.id !== id);
   saveWidgets();
   renderDashboard();
@@ -405,8 +423,11 @@ function openWidgetConfig(id) {
         ${renderWidgetConfigFields(widget)}
       </div>
       <div class="widget-config-footer">
-        <button class="widget-config-btn cancel">Cancel</button>
-        <button class="widget-config-btn save">Save</button>
+        <button class="widget-config-btn delete">Delete Widget</button>
+        <div class="widget-config-footer-right">
+          <button class="widget-config-btn cancel">Cancel</button>
+          <button class="widget-config-btn save">Save</button>
+        </div>
       </div>
     </div>
   `;
@@ -416,6 +437,12 @@ function openWidgetConfig(id) {
   // Close button
   dialog.querySelector('.widget-config-close').addEventListener('click', closeWidgetConfig);
   dialog.querySelector('.widget-config-btn.cancel').addEventListener('click', closeWidgetConfig);
+  
+  // Delete button
+  dialog.querySelector('.widget-config-btn.delete').addEventListener('click', () => {
+    closeWidgetConfig();
+    removeWidget(id);
+  });
   
   // Click outside to close
   dialog.addEventListener('click', (e) => {
@@ -642,13 +669,3 @@ document.addEventListener('click', (e) => {
   }
 });
 
-// Clock functionality
-function startClock() {
-  updateClock();
-  setInterval(updateClock, 1000);
-}
-
-function updateClock() {
-  // Notify all widgets of the tick
-  widgets.forEach(widget => widget.onTick());
-}

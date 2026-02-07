@@ -2,6 +2,15 @@
  * Base class for all widgets
  */
 export class WidgetBase {
+  /**
+   * Widget metadata for display in the UI.
+   * Override in subclasses to provide widget-specific info.
+   */
+  static metadata = {
+    name: 'Widget',
+    icon: '📦'
+  };
+
   constructor(config) {
     this.id = config.id;
     this.type = config.type;
@@ -96,10 +105,11 @@ export class WidgetBase {
   }
 
   /**
-   * Called on each clock tick (every second)
+   * Clean up widget resources (intervals, listeners, etc.)
+   * Called when widget is removed from the dashboard.
    */
-  onTick() {
-    // Override in subclasses that need periodic updates
+  destroy() {
+    // Override in subclasses that need cleanup
   }
 
   /**
@@ -136,15 +146,12 @@ export class WidgetBase {
     el.style.gridRow = `${this.y + 1} / span ${this.height}`;
 
     el.innerHTML = `
-      <div class="widget-controls">
-        <button class="widget-control drag-handle" title="Drag to move">⠿</button>
-        <button class="widget-control config" title="Configure">⚙</button>
-        <button class="widget-control delete" title="Remove">✕</button>
-      </div>
+      <button class="widget-control drag-handle" title="Drag to move">✜</button>
+      <button class="widget-control config" title="Configure">⚙</button>
+      <button class="widget-control resize-handle" title="Drag to resize">⤢</button>
       <div class="widget-content">
         ${this.getContent()}
       </div>
-      <button class="widget-control resize-handle" title="Drag to resize">⤢</button>
     `;
 
     this.element = el;
@@ -154,11 +161,6 @@ export class WidgetBase {
     el.querySelector('.widget-control.config').addEventListener('click', (e) => {
       e.stopPropagation();
       openWidgetConfig(this.id);
-    });
-
-    el.querySelector('.widget-control.delete').addEventListener('click', (e) => {
-      e.stopPropagation();
-      removeWidget(this.id);
     });
 
     // Setup drag and drop for moving
