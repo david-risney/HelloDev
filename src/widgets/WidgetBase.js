@@ -1,5 +1,83 @@
 /**
  * Base class for all widgets
+ * 
+ * ================================================================================
+ * HOW TO ADD A NEW WIDGET
+ * ================================================================================
+ * 
+ * 1. CREATE THE WIDGET FILE
+ *    - Create a new file in src/widgets/ named YourWidget.js
+ *    - Import and extend WidgetBase:
+ *      
+ *      import { WidgetBase } from './WidgetBase.js';
+ *      
+ *      export class YourWidget extends WidgetBase {
+ *        static metadata = {
+ *          name: 'Your Widget',
+ *          icon: '🎯'  // Choose an appropriate emoji
+ *        };
+ *        
+ *        getContent() {
+ *          return '<div class="your-widget">Your content here</div>';
+ *        }
+ *        
+ *        setup() {
+ *          // Optional: Add event listeners, initialize state, etc.
+ *        }
+ *        
+ *        cleanup() {
+ *          // Optional: Clean up timers, event listeners, etc.
+ *        }
+ *      }
+ * 
+ * 2. REGISTER THE WIDGET IN index.js
+ *    - Add an export statement at the top:
+ *      export { YourWidget } from './YourWidget.js';
+ *    
+ *    - Add an import statement:
+ *      import { YourWidget } from './YourWidget.js';
+ *    
+ *    - Add to WidgetRegistry with a unique key:
+ *      export const WidgetRegistry = {
+ *        ...existing widgets...,
+ *        yourwidget: YourWidget
+ *      };
+ * 
+ * 3. ADD STYLES (Optional)
+ *    - Add CSS for your widget in src/hellodev.css
+ *    - Use a class prefix matching your widget (e.g., .your-widget)
+ * 
+ * 4. ADD CONFIGURATION (Optional)
+ *    - Override getConfigSchema() to define user-configurable options
+ *    - See the getConfigSchema() method documentation below for field types
+ * 
+ * 5. ADD TO DEFAULT LAYOUT (Optional)
+ *    - To include the widget in the default layout for new users, add an entry
+ *      to DEFAULT_WIDGETS in src/hellodev.js with position and size:
+ *      { id: 'unique-id', type: 'yourwidget', x: 0, y: 0, width: 2, height: 2 }
+ * 
+ * ================================================================================
+ * HOW TO REMOVE A WIDGET
+ * ================================================================================
+ * 
+ * 1. REMOVE FROM index.js
+ *    - Delete the export statement: export { YourWidget } from './YourWidget.js';
+ *    - Delete the import statement: import { YourWidget } from './YourWidget.js';
+ *    - Remove from WidgetRegistry: yourwidget: YourWidget
+ * 
+ * 2. DELETE THE WIDGET FILE
+ *    - Delete src/widgets/YourWidget.js
+ * 
+ * 3. REMOVE STYLES (if any)
+ *    - Delete any CSS rules for the widget from src/hellodev.css
+ * 
+ * 4. REMOVE FROM DEFAULT LAYOUT (if present)
+ *    - Remove the widget entry from DEFAULT_WIDGETS in src/hellodev.js
+ * 
+ * 5. NOTE: Existing user configurations with this widget type will gracefully
+ *    fall back to WidgetBase (showing "Unknown widget")
+ * 
+ * ================================================================================
  */
 export class WidgetBase {
   /**

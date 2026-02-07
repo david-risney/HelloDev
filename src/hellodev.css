@@ -4,6 +4,10 @@
   box-sizing: border-box;
 }
 
+html, body {
+  overscroll-behavior: none;
+}
+
 :root {
   /* Base theme colors - can be customized */
   --color-primary: #1a1a2e;
@@ -40,6 +44,7 @@ body {
   background: var(--bg-primary);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
   color: var(--text-primary);
+  overscroll-behavior: none;
 }
 
 /* Header */
