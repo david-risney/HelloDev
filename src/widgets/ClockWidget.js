@@ -6,7 +6,8 @@ import { WidgetBase } from './WidgetBase.js';
 export class ClockWidget extends WidgetBase {
   static metadata = {
     name: 'Clock',
-    icon: '🕐'
+    icon: '🕐',
+    defaultSize: { width: 3, height: 2 }
   };
 
   constructor(config) {

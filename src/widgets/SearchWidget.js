@@ -6,7 +6,8 @@ import { WidgetBase } from './WidgetBase.js';
 export class SearchWidget extends WidgetBase {
   static metadata = {
     name: 'Search',
-    icon: '🔍'
+    icon: '🔍',
+    defaultSize: { width: 4, height: 1 }
   };
 
   static DEFAULT_URL_TEMPLATE = 'https://www.google.com/search?q={query}';

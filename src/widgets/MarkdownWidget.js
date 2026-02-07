@@ -6,7 +6,8 @@ import { WidgetBase } from './WidgetBase.js';
 export class MarkdownWidget extends WidgetBase {
   static metadata = {
     name: 'Markdown',
-    icon: '📄'
+    icon: '📄',
+    defaultSize: { width: 4, height: 3 }
   };
 
   constructor(config) {

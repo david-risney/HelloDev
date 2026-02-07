@@ -8,7 +8,8 @@ import { ADOAuthHelper } from '../ADOAuthHelper.js';
 export class ADOPRWidget extends WidgetBase {
   static metadata = {
     name: 'ADO PRs',
-    icon: '🔀'
+    icon: '🔀',
+    defaultSize: { width: 4, height: 4 }
   };
 
   constructor(config) {
@@ -31,6 +32,7 @@ export class ADOPRWidget extends WidgetBase {
     this.data.creatorEmail ??= '';
     this.data.reviewerEmail ??= '';
     this.data.targetBranch ??= '';
+    this.data.titleText ??= '';
     
     // Cache for resolved user IDs
     this._userIdCache = {};
@@ -133,8 +135,32 @@ export class ADOPRWidget extends WidgetBase {
         label: 'Target Branch (optional, e.g. main)',
         type: 'string',
         default: ''
+      },
+      {
+        key: 'titleText',
+        label: 'Title Contains (optional)',
+        type: 'string',
+        default: ''
       }
     ];
+  }
+
+  /**
+   * Override setConfig to clear cache and refresh when config changes.
+   */
+  setConfig(values) {
+    super.setConfig(values);
+    
+    // Clear cached data
+    this.prs = [];
+    this.lastFetched = null;
+    this.lastServerFetch = null;
+    localStorage.removeItem(this.getCacheKey());
+    
+    // Refresh if configured
+    if (this.isConfigured && this.element) {
+      this.fetchPRs();
+    }
   }
 
   getContent() {
@@ -312,6 +338,11 @@ export class ADOPRWidget extends WidgetBase {
         ? this.data.targetBranch 
         : `refs/heads/${this.data.targetBranch}`;
       url += `&searchCriteria.targetRefName=${encodeURIComponent(branchRef)}`;
+    }
+    
+    // Add title text filter
+    if (this.data.titleText) {
+      url += `&searchCriteria.title=${encodeURIComponent(this.data.titleText)}`;
     }
     
     return url;

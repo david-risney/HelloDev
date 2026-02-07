@@ -6,7 +6,8 @@ import { WidgetBase } from './WidgetBase.js';
 export class NotesWidget extends WidgetBase {
   static metadata = {
     name: 'Notes',
-    icon: '📝'
+    icon: '📝',
+    defaultSize: { width: 3, height: 3 }
   };
 
   constructor(config) {

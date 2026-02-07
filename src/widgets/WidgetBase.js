@@ -86,7 +86,8 @@ export class WidgetBase {
    */
   static metadata = {
     name: 'Widget',
-    icon: '📦'
+    icon: '📦',
+    defaultSize: { width: 2, height: 2 }
   };
 
   constructor(config) {
