@@ -28,6 +28,12 @@ export class ADOPRWidget extends WidgetBase {
     this.data.status ??= 'active';
     this.data.maxCount ??= 10;
     this.data.refreshInterval ??= 60;
+    this.data.creatorEmail ??= '';
+    this.data.reviewerEmail ??= '';
+    this.data.targetBranch ??= '';
+    
+    // Cache for resolved user IDs
+    this._userIdCache = {};
     
     this.restoreFromCache();
   }
@@ -109,6 +115,24 @@ export class ADOPRWidget extends WidgetBase {
         label: 'Auto Refresh (minutes, 0 = disabled)',
         type: 'number',
         default: 60
+      },
+      {
+        key: 'creatorEmail',
+        label: 'Creator Email (optional)',
+        type: 'string',
+        default: ''
+      },
+      {
+        key: 'reviewerEmail',
+        label: 'Reviewer Email (optional)',
+        type: 'string',
+        default: ''
+      },
+      {
+        key: 'targetBranch',
+        label: 'Target Branch (optional, e.g. main)',
+        type: 'string',
+        default: ''
       }
     ];
   }
@@ -258,7 +282,7 @@ export class ADOPRWidget extends WidgetBase {
     }
   }
   
-  buildApiUrl() {
+  buildApiUrl(creatorId, reviewerId) {
     const org = encodeURIComponent(this.data.organization);
     const project = encodeURIComponent(this.data.project);
     
@@ -272,7 +296,115 @@ export class ADOPRWidget extends WidgetBase {
     }
     url += `&$top=${this.data.maxCount || 10}`;
     
+    // Add creator filter
+    if (creatorId) {
+      url += `&searchCriteria.creatorId=${encodeURIComponent(creatorId)}`;
+    }
+    
+    // Add reviewer filter
+    if (reviewerId) {
+      url += `&searchCriteria.reviewerId=${encodeURIComponent(reviewerId)}`;
+    }
+    
+    // Add target branch filter
+    if (this.data.targetBranch) {
+      const branchRef = this.data.targetBranch.startsWith('refs/') 
+        ? this.data.targetBranch 
+        : `refs/heads/${this.data.targetBranch}`;
+      url += `&searchCriteria.targetRefName=${encodeURIComponent(branchRef)}`;
+    }
+    
     return url;
+  }
+
+  /**
+   * Look up a user's GUID by email or display name
+   */
+  async resolveUserId(emailOrName, accessToken) {
+    if (!emailOrName) return null;
+    
+    // Check cache first
+    if (this._userIdCache[emailOrName]) {
+      return this._userIdCache[emailOrName];
+    }
+    
+    const org = encodeURIComponent(this.data.organization);
+    
+    // Use the Graph API to search for users
+    // The subjectQuery parameter searches across display name and email
+    const url = `https://vssps.dev.azure.com/${org}/_apis/graph/users?api-version=7.0-preview.1&subjectTypes=aad,msa&$top=10`;
+    
+    try {
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        console.warn(`[ADOPRWidget] Failed to search users: ${response.status}`);
+        return null;
+      }
+      
+      const data = await response.json();
+      const users = data.value || [];
+      
+      // Find user by email (principalName) or display name
+      const searchLower = emailOrName.toLowerCase();
+      const user = users.find(u => 
+        u.principalName?.toLowerCase() === searchLower ||
+        u.displayName?.toLowerCase() === searchLower ||
+        u.mailAddress?.toLowerCase() === searchLower
+      );
+      
+      if (user) {
+        // Extract the user ID from the descriptor or use originId
+        // The descriptor format is typically: aad.{base64-encoded-id}
+        const userId = user.originId || user.descriptor;
+        this._userIdCache[emailOrName] = userId;
+        return userId;
+      }
+      
+      // If exact match not found, try a more specific search using identities API
+      return await this.resolveUserIdViaIdentities(emailOrName, accessToken);
+    } catch (err) {
+      console.warn(`[ADOPRWidget] Error resolving user '${emailOrName}':`, err);
+      return null;
+    }
+  }
+
+  /**
+   * Fallback user lookup using the identities API
+   */
+  async resolveUserIdViaIdentities(emailOrName, accessToken) {
+    const org = encodeURIComponent(this.data.organization);
+    const url = `https://vssps.dev.azure.com/${org}/_apis/identities?api-version=7.0&searchFilter=General&filterValue=${encodeURIComponent(emailOrName)}`;
+    
+    try {
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) return null;
+      
+      const data = await response.json();
+      const identities = data.value || [];
+      
+      if (identities.length > 0) {
+        const userId = identities[0].id;
+        this._userIdCache[emailOrName] = userId;
+        return userId;
+      }
+      
+      return null;
+    } catch (err) {
+      console.warn(`[ADOPRWidget] Error in identity lookup:`, err);
+      return null;
+    }
   }
 
   async fetchPRs() {
@@ -286,10 +418,32 @@ export class ADOPRWidget extends WidgetBase {
     try {
       const accessToken = await ADOAuthHelper.getToken();
 
+      // Resolve user IDs if email filters are configured
+      let creatorId = null;
+      let reviewerId = null;
+      
+      if (this.data.creatorEmail) {
+        this.loadingStatus = 'Looking up creator...';
+        this.updateContent();
+        creatorId = await this.resolveUserId(this.data.creatorEmail, accessToken);
+        if (!creatorId) {
+          console.warn(`[ADOPRWidget] Could not resolve creator: ${this.data.creatorEmail}`);
+        }
+      }
+      
+      if (this.data.reviewerEmail) {
+        this.loadingStatus = 'Looking up reviewer...';
+        this.updateContent();
+        reviewerId = await this.resolveUserId(this.data.reviewerEmail, accessToken);
+        if (!reviewerId) {
+          console.warn(`[ADOPRWidget] Could not resolve reviewer: ${this.data.reviewerEmail}`);
+        }
+      }
+
       this.loadingStatus = 'Fetching pull requests...';
       this.updateContent();
 
-      const response = await fetch(this.buildApiUrl(), {
+      const response = await fetch(this.buildApiUrl(creatorId, reviewerId), {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
           'Content-Type': 'application/json'

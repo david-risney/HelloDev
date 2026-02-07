@@ -10,36 +10,17 @@
   <header class="header">
     <h1 class="logo">HelloDev</h1>
     <div class="header-controls">
-      <button class="header-btn" id="themeToggle" title="Toggle light/dark mode">
-        <span class="theme-icon">☾</span>
+      <button class="header-btn edit-mode-btn" id="addWidgetBtn" title="Add Widget">
+        <span>+</span>
+      </button>
+      <button class="header-btn edit-mode-btn" id="customizeBtn" title="Customize Appearance">
+        <span>🎨</span>
       </button>
       <button class="header-btn" id="editToggle" title="Edit">
         <span class="edit-icon">⚙</span>
       </button>
     </div>
   </header>
-
-  <div class="widget-panel" id="widgetPanel">
-    <div class="widget-panel-section">
-      <h2>Add Widget</h2>
-      <div class="widget-options">
-        <!-- Widget buttons are dynamically generated from WidgetRegistry -->
-      </div>
-    </div>
-    <div class="widget-panel-section theme-section">
-      <h2>Theme Colors</h2>
-      <div class="theme-colors">
-        <label class="theme-color-picker">
-          <span>Primary</span>
-          <input type="color" id="colorPrimary" value="#1a1a2e">
-        </label>
-        <label class="theme-color-picker">
-          <span>Accent</span>
-          <input type="color" id="colorAccent" value="#667eea">
-        </label>
-      </div>
-    </div>
-  </div>
 
   <main class="dashboard" id="dashboard">
     <!-- Widgets are rendered here -->

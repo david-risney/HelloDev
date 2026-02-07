@@ -139,7 +139,7 @@ export class WidgetBase {
     const el = document.createElement('div');
     el.className = `widget widget-${this.type}`;
     el.dataset.id = this.id;
-    el.draggable = true;
+    el.draggable = false; // Only enabled in edit mode via class
     
     // Set grid position and size using CSS grid placement
     el.style.gridColumn = `${this.x + 1} / span ${this.width}`;
@@ -193,7 +193,7 @@ export class WidgetBase {
       const startHeight = this.height;
       
       const onMouseMove = (moveEvent) => {
-        const cellSize = 160; // GRID_CELL_SIZE
+        const cellSize = 80; // GRID_CELL_SIZE
         const gap = 16; // grid gap
         const deltaX = moveEvent.clientX - startX;
         const deltaY = moveEvent.clientY - startY;
@@ -213,7 +213,7 @@ export class WidgetBase {
         el.classList.remove('resizing');
         el.draggable = true; // Re-enable drag
         
-        const cellSize = 160;
+        const cellSize = 80; // GRID_CELL_SIZE
         const gap = 16;
         const deltaX = upEvent.clientX - startX;
         const deltaY = upEvent.clientY - startY;

@@ -10,13 +10,13 @@ const THEME_STORAGE_KEY = 'hellodev-theme';
 const STORAGE_VERSION = 1;
 
 // Grid cell size in pixels
-const GRID_CELL_SIZE = 160;
+const GRID_CELL_SIZE = 80;
 
 // Default theme colors
 const DEFAULT_THEME = {
   colorPrimary: '#1a1a2e',
   colorAccent: '#667eea',
-  lightMode: false
+  themeMode: 'auto' // 'auto', 'light', or 'dark'
 };
 
 // ============================================================================
@@ -25,21 +25,73 @@ const DEFAULT_THEME = {
 
 // Default widget configurations
 const DEFAULT_WIDGETS = [
-  { id: 'widget-1', type: 'clock', x: 0, y: 0, width: 2, height: 1 },
-  { id: 'widget-2', type: 'search', x: 2, y: 0, width: 2, height: 1 }
+  { id: 'widget-1', type: 'clock', x: 0, y: 0, width: 3, height: 2 },
+  { 
+    id: 'widget-2', 
+    type: 'markdown', 
+    x: 4, 
+    y: 1, 
+    width: 5, 
+    height: 4,
+    data: {
+      markdown: `# Welcome to HelloDev! 👋
+
+Your personal developer dashboard is ready to customize.
+
+## Getting Started
+
+1. **Click the ⚙ button** in the top-right to enter edit mode
+2. **Add widgets** from the panel that appears
+3. **Drag and resize widgets** to arrange your layout
+4. **Configure widgets** by clicking ⚙ on each one
+
+*Delete this widget when you're ready!*`
+    }
+  }
 ];
 
 // State
 let widgets = [];
 let editMode = false;
-let lightMode = false;
+let themeMode = 'auto'; // 'auto', 'light', or 'dark'
 let draggingWidget = null;
+
+// Detect OS color scheme preference
+const osPrefersDark = window.matchMedia('(prefers-color-scheme: dark)');
+
+// Get effective light mode based on themeMode setting
+function getEffectiveLightMode() {
+  if (themeMode === 'auto') {
+    return !osPrefersDark.matches;
+  }
+  return themeMode === 'light';
+}
+
+// Get display text for theme mode button
+function getThemeModeDisplay(mode) {
+  switch (mode) {
+    case 'auto': return '✨ Auto';
+    case 'light': return '☀ Light';
+    case 'dark': return '☾ Dark';
+    default: return '✨ Auto';
+  }
+}
+
+// Cycle to next theme mode
+function getNextThemeMode(current) {
+  const modes = ['auto', 'light', 'dark'];
+  const idx = modes.indexOf(current);
+  return modes[(idx + 1) % modes.length];
+}
 
 // DOM elements
 const dashboard = document.getElementById('dashboard');
 const editToggle = document.getElementById('editToggle');
-const themeToggle = document.getElementById('themeToggle');
-const widgetPanel = document.getElementById('widgetPanel');
+const addWidgetBtn = document.getElementById('addWidgetBtn');
+const customizeBtn = document.getElementById('customizeBtn');
+
+// Theme state
+let currentTheme = { ...DEFAULT_THEME };
 
 // Initialize
 document.addEventListener('DOMContentLoaded', init);
@@ -50,7 +102,6 @@ function init() {
   renderDashboard();
   setupEventListeners();
   setupDashboardDragDrop();
-  setupThemeControls();
 }
 
 // Load widgets from storage
@@ -114,14 +165,28 @@ function loadTheme() {
 
   if (stored) {
     try {
-      theme = { ...DEFAULT_THEME, ...JSON.parse(stored) };
+      const parsed = JSON.parse(stored);
+      // Migrate old lightMode boolean to new themeMode
+      if ('lightMode' in parsed && !('themeMode' in parsed)) {
+        parsed.themeMode = parsed.lightMode ? 'light' : 'dark';
+        delete parsed.lightMode;
+      }
+      theme = { ...DEFAULT_THEME, ...parsed };
     } catch (e) {
       theme = DEFAULT_THEME;
     }
   }
 
-  lightMode = theme.lightMode || false;
+  currentTheme = theme;
+  themeMode = theme.themeMode || 'auto';
   applyTheme(theme);
+  
+  // Listen for OS theme changes when in auto mode
+  osPrefersDark.addEventListener('change', () => {
+    if (themeMode === 'auto') {
+      applyTheme(currentTheme);
+    }
+  });
 }
 
 // Apply theme colors to CSS custom properties
@@ -129,82 +194,241 @@ function applyTheme(theme) {
   document.documentElement.style.setProperty('--color-primary', theme.colorPrimary);
   document.documentElement.style.setProperty('--color-accent', theme.colorAccent);
   
-  // Apply light/dark mode
-  document.body.classList.toggle('light-mode', theme.lightMode || false);
-  if (themeToggle) {
-    themeToggle.querySelector('.theme-icon').textContent = theme.lightMode ? '☀' : '☾';
-  }
+  // Apply light/dark mode based on themeMode setting
+  const isLight = getEffectiveLightMode();
+  document.body.classList.toggle('light-mode', isLight);
 }
 
 // Save theme to storage
 function saveTheme(theme) {
+  currentTheme = theme;
   localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify(theme));
   applyTheme(theme);
 }
 
-// Setup theme color picker controls
-function setupThemeControls() {
-  const primaryInput = document.getElementById('colorPrimary');
-  const accentInput = document.getElementById('colorAccent');
-
-  // Load saved values into inputs
-  const stored = localStorage.getItem(THEME_STORAGE_KEY);
-  if (stored) {
-    try {
-      const theme = JSON.parse(stored);
-      if (theme.colorPrimary) primaryInput.value = theme.colorPrimary;
-      if (theme.colorAccent) accentInput.value = theme.colorAccent;
-    } catch (e) {
-      // Use defaults
-    }
+// Show Add Widget flyout
+function showAddWidgetFlyout() {
+  closeAllFlyouts();
+  
+  const flyout = document.createElement('div');
+  flyout.className = 'flyout';
+  flyout.id = 'addWidgetFlyout';
+  
+  let widgetButtons = '';
+  for (const [type, WidgetClass] of Object.entries(WidgetRegistry)) {
+    const { name, icon } = WidgetClass.metadata;
+    widgetButtons += `<button class="widget-option" data-widget="${type}">${icon} ${name}</button>`;
   }
+  
+  flyout.innerHTML = `
+    <div class="flyout-dialog">
+      <div class="flyout-header">
+        <h3>Add Widget</h3>
+        <button class="flyout-close" title="Close">✕</button>
+      </div>
+      <div class="flyout-content">
+        <div class="widget-options-grid">
+          ${widgetButtons}
+        </div>
+      </div>
+    </div>
+  `;
+  
+  addWidgetBtn.appendChild(flyout);
+  
+  // Close button
+  flyout.querySelector('.flyout-close').addEventListener('click', (e) => {
+    e.stopPropagation();
+    closeAllFlyouts();
+  });
+  
+  // Prevent clicks inside flyout from closing it
+  flyout.addEventListener('click', (e) => {
+    e.stopPropagation();
+  });
+  
+  // Widget buttons
+  flyout.querySelectorAll('.widget-option').forEach(btn => {
+    btn.addEventListener('click', () => {
+      addWidget(btn.dataset.widget);
+      closeAllFlyouts();
+    });
+  });
+  
+  // Close when clicking outside
+  setTimeout(() => {
+    document.addEventListener('click', handleOutsideClick);
+  }, 0);
+}
 
-  // Update theme on color change
+// Color presets
+const COLOR_PRESETS = [
+  { name: 'Default', primary: '#1a1a2e', accent: '#667eea' },
+  { name: 'Ocean', primary: '#0a192f', accent: '#64ffda' },
+  { name: 'Forest', primary: '#1a2f1a', accent: '#4ade80' },
+  { name: 'Sunset', primary: '#2d1b3d', accent: '#f97316' },
+  { name: 'Rose', primary: '#1f1f2e', accent: '#f43f5e' },
+  { name: 'Lavender', primary: '#1e1b2e', accent: '#a78bfa' },
+  { name: 'Coffee', primary: '#1c1410', accent: '#d4a574' },
+  { name: 'Hotdog', primary: '#ffeb3b', accent: '#f44336' }
+];
+
+// Show Appearance flyout
+function showCustomizeFlyout() {
+  closeAllFlyouts();
+  
+  const flyout = document.createElement('div');
+  flyout.className = 'flyout';
+  flyout.id = 'customizeFlyout';
+  
+  const presetButtons = COLOR_PRESETS.map(preset => 
+    `<button class="preset-btn" data-primary="${preset.primary}" data-accent="${preset.accent}" title="${preset.name}">
+      <span class="preset-primary" style="background: ${preset.primary}"></span>
+      <span class="preset-accent" style="background: ${preset.accent}"></span>
+    </button>`
+  ).join('');
+  
+  flyout.innerHTML = `
+    <div class="flyout-dialog">
+      <div class="flyout-header">
+        <h3>Appearance</h3>
+        <button class="flyout-close" title="Close">✕</button>
+      </div>
+      <div class="flyout-content">
+        <div class="customize-section">
+          <div class="customize-label">Presets</div>
+          <div class="presets-grid">
+            ${presetButtons}
+          </div>
+        </div>
+        <div class="customize-section">
+          <div class="customize-label">Custom Colors</div>
+          <div class="customize-row">
+            <span>Primary</span>
+            <input type="color" id="flyoutColorPrimary" value="${currentTheme.colorPrimary}">
+          </div>
+          <div class="customize-row">
+            <span>Accent</span>
+            <input type="color" id="flyoutColorAccent" value="${currentTheme.colorAccent}">
+          </div>
+        </div>
+        <div class="customize-section">
+          <div class="customize-row">
+            <span>Theme</span>
+            <button class="toggle-btn" id="flyoutThemeModeToggle">
+              ${getThemeModeDisplay(themeMode)}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  customizeBtn.appendChild(flyout);
+  
+  const primaryInput = flyout.querySelector('#flyoutColorPrimary');
+  const accentInput = flyout.querySelector('#flyoutColorAccent');
+  const themeModeToggle = flyout.querySelector('#flyoutThemeModeToggle');
+  
+  // Close button
+  flyout.querySelector('.flyout-close').addEventListener('click', (e) => {
+    e.stopPropagation();
+    closeAllFlyouts();
+  });
+  
+  // Prevent clicks inside flyout from closing it
+  flyout.addEventListener('click', (e) => {
+    e.stopPropagation();
+  });
+  
+  // Preset buttons
+  flyout.querySelectorAll('.preset-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const primary = btn.dataset.primary;
+      const accent = btn.dataset.accent;
+      primaryInput.value = primary;
+      accentInput.value = accent;
+      saveTheme({
+        colorPrimary: primary,
+        colorAccent: accent,
+        themeMode: themeMode
+      });
+    });
+  });
+  
+  // Color inputs
   primaryInput.addEventListener('input', () => {
     saveTheme({
       colorPrimary: primaryInput.value,
       colorAccent: accentInput.value,
-      lightMode: lightMode
+      themeMode: themeMode
     });
   });
-
+  
   accentInput.addEventListener('input', () => {
     saveTheme({
       colorPrimary: primaryInput.value,
       colorAccent: accentInput.value,
-      lightMode: lightMode
+      themeMode: themeMode
     });
   });
-
-  // Light/dark mode toggle
-  themeToggle.addEventListener('click', () => {
-    lightMode = !lightMode;
+  
+  // Theme mode toggle (cycles through auto -> light -> dark)
+  themeModeToggle.addEventListener('click', (e) => {
+    e.preventDefault();
+    themeMode = getNextThemeMode(themeMode);
+    themeModeToggle.textContent = getThemeModeDisplay(themeMode);
     saveTheme({
       colorPrimary: primaryInput.value,
       colorAccent: accentInput.value,
-      lightMode: lightMode
+      themeMode: themeMode
     });
   });
+  
+  // Close when clicking outside
+  setTimeout(() => {
+    document.addEventListener('click', handleOutsideClick);
+  }, 0);
+}
+
+// Handle clicks outside flyouts
+function handleOutsideClick(e) {
+  const flyout = document.querySelector('.flyout');
+  if (flyout && !flyout.contains(e.target) && !addWidgetBtn.contains(e.target) && !customizeBtn.contains(e.target)) {
+    closeAllFlyouts();
+  }
+}
+
+// Close all flyouts
+function closeAllFlyouts() {
+  document.querySelectorAll('.flyout').forEach(f => f.remove());
+  document.removeEventListener('click', handleOutsideClick);
 }
 
 // Setup event listeners
 function setupEventListeners() {
   // Edit mode toggle
   editToggle.addEventListener('click', toggleEditMode);
-
-  // Dynamically generate widget buttons from registry
-  const widgetOptionsContainer = widgetPanel.querySelector('.widget-options');
-  widgetOptionsContainer.innerHTML = '';
   
-  for (const [type, WidgetClass] of Object.entries(WidgetRegistry)) {
-    const { name, icon } = WidgetClass.metadata;
-    const btn = document.createElement('button');
-    btn.className = 'widget-option';
-    btn.dataset.widget = type;
-    btn.textContent = `${icon} ${name}`;
-    btn.addEventListener('click', () => addWidget(type));
-    widgetOptionsContainer.appendChild(btn);
-  }
+  // Add widget button
+  addWidgetBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (document.getElementById('addWidgetFlyout')) {
+      closeAllFlyouts();
+    } else {
+      showAddWidgetFlyout();
+    }
+  });
+  
+  // Customize button
+  customizeBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (document.getElementById('customizeFlyout')) {
+      closeAllFlyouts();
+    } else {
+      showCustomizeFlyout();
+    }
+  });
 }
 
 // Toggle edit mode
@@ -214,7 +438,20 @@ function toggleEditMode() {
   editToggle.querySelector('.edit-icon').textContent = editMode ? '✓' : '⚙';
   editToggle.title = editMode ? 'Done' : 'Edit';
   dashboard.classList.toggle('edit-mode', editMode);
-  widgetPanel.classList.toggle('visible', editMode);
+  
+  // Show/hide edit mode buttons
+  addWidgetBtn.classList.toggle('visible', editMode);
+  customizeBtn.classList.toggle('visible', editMode);
+  
+  // Enable/disable widget dragging
+  dashboard.querySelectorAll('.widget').forEach(el => {
+    el.draggable = editMode;
+  });
+  
+  // Close flyouts when exiting edit mode
+  if (!editMode) {
+    closeAllFlyouts();
+  }
 }
 
 // Render the dashboard
@@ -233,6 +470,10 @@ function renderDashboard() {
 
   widgets.forEach(widget => {
     const el = widget.createElement(removeWidget, resizeWidget, openWidgetConfig);
+    // If in edit mode, make widget draggable
+    if (editMode) {
+      el.draggable = true;
+    }
     dashboard.appendChild(el);
   });
 }
