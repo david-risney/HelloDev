@@ -1,5 +1,6 @@
 import { WidgetBase } from './WidgetBase.js';
 import { ADOAuthHelper } from '../ADOAuthHelper.js';
+import { TimeFormatter } from '../TimeFormatter.js';
 
 /**
  * Azure DevOps Pull Request widget - displays a list of PRs
@@ -17,7 +18,8 @@ export class ADOPRWidget extends WidgetBase {
     this.prs = [];
     this.loading = false;
     this.loadingStatus = '';       // Current loading sub-activity
-    this.error = null;
+    this.error = null;             // { message: string, details?: string } | null
+    this.errorDialogOpen = false;
     this.lastFetched = null;      // Timestamp for display (includes cache restore)
     this.lastServerFetch = null;  // Timestamp of actual server fetch (for auto-refresh)
     this.intervalId = null;
@@ -34,6 +36,7 @@ export class ADOPRWidget extends WidgetBase {
     this.data.targetBranch ??= '';
     this.data.titleText ??= '';
     this.data.title ??= '';
+    this.data.maxAgeDays ??= 0;
     
     // Cache for resolved user IDs
     this._userIdCache = {};
@@ -148,6 +151,12 @@ export class ADOPRWidget extends WidgetBase {
         label: 'Widget Title (optional)',
         type: 'string',
         default: ''
+      },
+      {
+        key: 'maxAgeDays',
+        label: 'Max Age in Days (0 = no limit)',
+        type: 'number',
+        default: 0
       }
     ];
   }
@@ -180,37 +189,8 @@ export class ADOPRWidget extends WidgetBase {
       `;
     }
 
-    if (this.loading) {
-      return `
-        <div class="widget-adopr-loading">
-          <div class="widget-adopr-spinner">⟳</div>
-          <p>${this.loadingStatus || 'Loading...'}</p>
-        </div>
-      `;
-    }
-
-    if (this.error) {
-      return `
-        <div class="widget-adopr-error">
-          <div class="widget-adopr-icon">⚠️</div>
-          <p>${this.error}</p>
-          <button class="widget-adopr-retry">Retry</button>
-        </div>
-      `;
-    }
-
-    if (this.prs.length === 0) {
-      return `
-        <div class="widget-adopr-empty">
-          <div class="widget-adopr-icon">✓</div>
-          <p>No pull requests found</p>
-          <button class="widget-adopr-refresh" title="Reload">⟳</button>
-        </div>
-      `;
-    }
-
     const lastFetchedStr = this.lastFetched 
-      ? new Date(this.lastFetched).toLocaleTimeString()
+      ? TimeFormatter.formatRelative(this.lastFetched)
       : '';
 
     const displayTitle = this.escapeHtml(this.data.title || 'Pull Requests');
@@ -218,16 +198,81 @@ export class ADOPRWidget extends WidgetBase {
       ? `<a href="${this.getPRListUrl()}" target="_blank" class="widget-adopr-title-link">${displayTitle}</a>`
       : `<span class="widget-adopr-title">${displayTitle}</span>`;
 
+    // Status indicator in upper right
+    let statusHtml = '';
+    if (this.loading) {
+      statusHtml = `<span class="widget-adopr-status-indicator widget-adopr-status-loading" title="${this.loadingStatus || 'Loading...'}">⟳</span>`;
+    } else if (this.error) {
+      statusHtml = `<button class="widget-adopr-status-indicator widget-adopr-status-error widget-adopr-error-btn" title="Click to see error details">⚠️</button>`;
+    }
+
+    // Error dialog
+    let errorDialogHtml = '';
+    if (this.error && this.errorDialogOpen) {
+      const errorMessage = this.escapeHtml(this.error.message || this.error);
+      const errorDetails = this.error.details ? `<pre class="widget-adopr-error-details">${this.escapeHtml(this.error.details)}</pre>` : '';
+      errorDialogHtml = `
+        <div class="widget-adopr-error-dialog">
+          <div class="widget-adopr-error-dialog-header">
+            <span>Error</span>
+            <button class="widget-adopr-error-dialog-close" title="Close">✕</button>
+          </div>
+          <div class="widget-adopr-error-dialog-content">
+            <p class="widget-adopr-error-message">${errorMessage}</p>
+            ${errorDetails}
+          </div>
+          <div class="widget-adopr-error-dialog-actions">
+            <button class="widget-adopr-retry">Retry</button>
+          </div>
+        </div>
+      `;
+    }
+
+    // Filter PRs by age if configured
+    const filteredPRs = this.getFilteredPRs();
+
+    // Show list content or empty state
+    let listContent;
+    if (filteredPRs.length === 0 && !this.loading) {
+      listContent = `
+        <div class="widget-adopr-empty">
+          <div class="widget-adopr-icon">✓</div>
+          <p>No pull requests found</p>
+        </div>
+      `;
+    } else {
+      listContent = `
+        <ul class="widget-adopr-list">
+          ${filteredPRs.map(pr => this.renderPR(pr)).join('')}
+        </ul>
+      `;
+    }
+
     return `
       <div class="widget-adopr-header">
         ${titleHtml}
         <span class="widget-adopr-last-updated" title="Last updated">${lastFetchedStr}</span>
+        ${statusHtml}
         <button class="widget-adopr-refresh" title="Reload">⟳</button>
       </div>
-      <ul class="widget-adopr-list">
-        ${this.prs.map(pr => this.renderPR(pr)).join('')}
-      </ul>
+      ${listContent}
+      ${errorDialogHtml}
     `;
+  }
+
+  getFilteredPRs() {
+    if (!this.data.maxAgeDays || this.data.maxAgeDays <= 0) {
+      return this.prs;
+    }
+    
+    const maxAgeMs = this.data.maxAgeDays * 24 * 60 * 60 * 1000;
+    const cutoffTime = Date.now() - maxAgeMs;
+    
+    return this.prs.filter(pr => {
+      if (!pr.creationDate) return true;
+      const createdTime = new Date(pr.creationDate).getTime();
+      return createdTime >= cutoffTime;
+    });
   }
 
   getPRListUrl() {
@@ -280,25 +325,7 @@ export class ADOPRWidget extends WidgetBase {
   }
 
   formatAge(dateString) {
-    if (!dateString) return '';
-    
-    const created = new Date(dateString);
-    const now = new Date();
-    const diffMs = now - created;
-    
-    const seconds = Math.floor(diffMs / 1000);
-    const minutes = Math.floor(seconds / 60);
-    const hours = Math.floor(minutes / 60);
-    const days = Math.floor(hours / 24);
-    const months = Math.floor(days / 30);
-    const years = Math.floor(days / 365);
-    
-    if (years > 0) return `${years} year${years > 1 ? 's' : ''} ago`;
-    if (months > 0) return `${months} month${months > 1 ? 's' : ''} ago`;
-    if (days > 0) return `${days} day${days > 1 ? 's' : ''} ago`;
-    if (hours > 0) return `${hours} hour${hours > 1 ? 's' : ''} ago`;
-    if (minutes > 0) return `${minutes} minute${minutes > 1 ? 's' : ''} ago`;
-    return 'just now';
+    return TimeFormatter.formatRelative(dateString);
   }
 
   getStatusClass(status) {
@@ -334,7 +361,24 @@ export class ADOPRWidget extends WidgetBase {
           e.target.classList.contains('widget-adopr-retry')) {
         e.preventDefault();
         e.stopPropagation();
+        this.errorDialogOpen = false;
         this.fetchPRs();
+      }
+      
+      // Toggle error dialog
+      if (e.target.classList.contains('widget-adopr-error-btn')) {
+        e.preventDefault();
+        e.stopPropagation();
+        this.errorDialogOpen = !this.errorDialogOpen;
+        this.updateContent();
+      }
+      
+      // Close error dialog
+      if (e.target.classList.contains('widget-adopr-error-dialog-close')) {
+        e.preventDefault();
+        e.stopPropagation();
+        this.errorDialogOpen = false;
+        this.updateContent();
       }
     });
 
@@ -520,7 +564,7 @@ export class ADOPRWidget extends WidgetBase {
         this.updateContent();
         creatorId = await this.resolveUserId(this.data.creatorEmail, accessToken);
         if (!creatorId) {
-          console.warn(`[ADOPRWidget] Could not resolve creator: ${this.data.creatorEmail}`);
+          throw new Error(`Could not resolve creator email: ${this.data.creatorEmail}`);
         }
       }
       
@@ -529,7 +573,7 @@ export class ADOPRWidget extends WidgetBase {
         this.updateContent();
         reviewerId = await this.resolveUserId(this.data.reviewerEmail, accessToken);
         if (!reviewerId) {
-          console.warn(`[ADOPRWidget] Could not resolve reviewer: ${this.data.reviewerEmail}`);
+          throw new Error(`Could not resolve reviewer email: ${this.data.reviewerEmail}`);
         }
       }
 
@@ -560,8 +604,28 @@ export class ADOPRWidget extends WidgetBase {
       this.lastServerFetch = this.lastFetched;
       this.saveToCache();
     } catch (err) {
-      this.error = err.message || 'Failed to fetch PRs';
-      ADOAuthHelper.handleAuthError(this.error);
+      const originalError = `\n\n--- Original Error ---\n${err.message || 'Unknown error'}\n${err.stack || ''}`;
+      
+      // Check if we're offline
+      if (!navigator.onLine) {
+        this.error = {
+          message: 'You appear to be offline',
+          details: 'Please check your internet connection and try again. Cached data (if available) is still being displayed.' + originalError
+        };
+      } else if (err.name === 'TypeError' && err.message.includes('fetch')) {
+        // Network error while online - could be DNS, firewall, etc.
+        this.error = {
+          message: 'Network error',
+          details: 'Could not connect to Azure DevOps. This may be a DNS issue, firewall blocking the connection, or the service may be temporarily unavailable.' + originalError
+        };
+      } else {
+        this.error = {
+          message: err.message || 'Failed to fetch PRs',
+          details: err.stack || null
+        };
+      }
+      this.errorDialogOpen = true;
+      ADOAuthHelper.handleAuthError(this.error.message);
     } finally {
       this.loading = false;
       this.loadingStatus = '';

@@ -40,7 +40,7 @@ Your personal developer dashboard is ready to customize.
 
 ## Getting Started
 
-1. **Click the ⚙ button** in the top-right to enter edit mode
+1. **Click the ☰ menu** in the top-right to enter edit mode
 2. **Add widgets** from the panel that appears
 3. **Drag and resize widgets** to arrange your layout
 4. **Configure widgets** by clicking ⚙ on each one
@@ -89,6 +89,8 @@ const dashboard = document.getElementById('dashboard');
 const editToggle = document.getElementById('editToggle');
 const addWidgetBtn = document.getElementById('addWidgetBtn');
 const customizeBtn = document.getElementById('customizeBtn');
+const dataBtn = document.getElementById('dataBtn');
+const aboutBtn = document.getElementById('aboutBtn');
 
 // Theme state
 let currentTheme = { ...DEFAULT_THEME };
@@ -391,10 +393,154 @@ function showCustomizeFlyout() {
   }, 0);
 }
 
+// Show About flyout
+async function showAboutFlyout() {
+  closeAllFlyouts();
+  
+  const flyout = document.createElement('div');
+  flyout.className = 'flyout';
+  flyout.id = 'aboutFlyout';
+  
+  // Get version from manifest.json
+  let version = '';
+  try {
+    const manifest = await fetch(chrome.runtime.getURL('manifest.json')).then(r => r.json());
+    version = manifest.version;
+  } catch (e) {
+    version = 'unknown';
+  }
+  
+  flyout.innerHTML = `
+    <div class="flyout-dialog about-dialog">
+      <div class="flyout-header">
+        <h3>About HelloDev</h3>
+        <button class="flyout-close" title="Close">✕</button>
+      </div>
+      <div class="flyout-content">
+        <div class="about-logo">
+          <span class="about-logo-text">HelloDev</span>
+          <span class="about-version">v${version}</span>
+        </div>
+        <div class="about-links">
+          <a href="https://github.com/david-risney/HelloDev" target="_blank" class="about-link">
+            <span class="about-link-icon">📦</span>
+            <span>GitHub Repository</span>
+          </a>
+          <a href="https://github.com/david-risney/HelloDev/blob/main/PRIVACY.md" target="_blank" class="about-link">
+            <span class="about-link-icon">🔒</span>
+            <span>Privacy Policy</span>
+          </a>
+          <a href="https://github.com/david-risney/HelloDev/issues" target="_blank" class="about-link">
+            <span class="about-link-icon">💬</span>
+            <span>Send Feedback</span>
+          </a>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  aboutBtn.appendChild(flyout);
+  
+  // Close button
+  flyout.querySelector('.flyout-close').addEventListener('click', (e) => {
+    e.stopPropagation();
+    closeAllFlyouts();
+  });
+  
+  // Prevent clicks inside flyout from closing it
+  flyout.addEventListener('click', (e) => {
+    e.stopPropagation();
+  });
+  
+  // Close when clicking outside
+  setTimeout(() => {
+    document.addEventListener('click', handleOutsideClick);
+  }, 0);
+}
+
+// Show Data Management flyout
+function showDataFlyout() {
+  closeAllFlyouts();
+  
+  const flyout = document.createElement('div');
+  flyout.className = 'flyout';
+  flyout.id = 'dataFlyout';
+  
+  flyout.innerHTML = `
+    <div class="flyout-dialog data-dialog">
+      <div class="flyout-header">
+        <h3>Manage Data</h3>
+        <button class="flyout-close" title="Close">✕</button>
+      </div>
+      <div class="flyout-content">
+        <div class="data-section">
+          <p class="data-description">Clear all HelloDev data including widgets, settings, and preferences. This action cannot be undone.</p>
+          <button class="data-clear-btn" id="clearDataBtn">
+            <span>🗑</span>
+            <span>Clear All Data</span>
+          </button>
+        </div>
+        <div class="data-confirm hidden" id="dataConfirm">
+          <p class="data-warning">⚠️ Are you sure? This will reset everything to defaults.</p>
+          <div class="data-confirm-buttons">
+            <button class="data-cancel-btn" id="dataCancelBtn">Cancel</button>
+            <button class="data-confirm-btn" id="dataConfirmBtn">Yes, Clear Everything</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  dataBtn.appendChild(flyout);
+  
+  const clearBtn = flyout.querySelector('#clearDataBtn');
+  const confirmSection = flyout.querySelector('#dataConfirm');
+  const cancelBtn = flyout.querySelector('#dataCancelBtn');
+  const confirmBtn = flyout.querySelector('#dataConfirmBtn');
+  
+  // Close button
+  flyout.querySelector('.flyout-close').addEventListener('click', (e) => {
+    e.stopPropagation();
+    closeAllFlyouts();
+  });
+  
+  // Prevent clicks inside flyout from closing it
+  flyout.addEventListener('click', (e) => {
+    e.stopPropagation();
+  });
+  
+  // Show confirmation
+  clearBtn.addEventListener('click', () => {
+    clearBtn.classList.add('hidden');
+    confirmSection.classList.remove('hidden');
+  });
+  
+  // Cancel confirmation
+  cancelBtn.addEventListener('click', () => {
+    confirmSection.classList.add('hidden');
+    clearBtn.classList.remove('hidden');
+  });
+  
+  // Confirm clear all data
+  confirmBtn.addEventListener('click', () => {
+    // Clear all localStorage data for HelloDev
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(THEME_STORAGE_KEY);
+    
+    // Reload the page to reset everything
+    window.location.reload();
+  });
+  
+  // Close when clicking outside
+  setTimeout(() => {
+    document.addEventListener('click', handleOutsideClick);
+  }, 0);
+}
+
 // Handle clicks outside flyouts
 function handleOutsideClick(e) {
   const flyout = document.querySelector('.flyout');
-  if (flyout && !flyout.contains(e.target) && !addWidgetBtn.contains(e.target) && !customizeBtn.contains(e.target)) {
+  if (flyout && !flyout.contains(e.target) && !addWidgetBtn.contains(e.target) && !customizeBtn.contains(e.target) && !dataBtn.contains(e.target) && !aboutBtn.contains(e.target)) {
     closeAllFlyouts();
   }
 }
@@ -429,19 +575,41 @@ function setupEventListeners() {
       showCustomizeFlyout();
     }
   });
+  
+  // Data button
+  dataBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (document.getElementById('dataFlyout')) {
+      closeAllFlyouts();
+    } else {
+      showDataFlyout();
+    }
+  });
+  
+  // About button
+  aboutBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (document.getElementById('aboutFlyout')) {
+      closeAllFlyouts();
+    } else {
+      showAboutFlyout();
+    }
+  });
 }
 
 // Toggle edit mode
 function toggleEditMode() {
   editMode = !editMode;
   editToggle.classList.toggle('active', editMode);
-  editToggle.querySelector('.edit-icon').textContent = editMode ? '✓' : '⚙';
-  editToggle.title = editMode ? 'Done' : 'Edit';
+  editToggle.querySelector('.edit-icon').textContent = editMode ? '✓' : '☰';
+  editToggle.title = editMode ? 'Done' : 'Menu';
   dashboard.classList.toggle('edit-mode', editMode);
   
   // Show/hide edit mode buttons
   addWidgetBtn.classList.toggle('visible', editMode);
   customizeBtn.classList.toggle('visible', editMode);
+  dataBtn.classList.toggle('visible', editMode);
+  aboutBtn.classList.toggle('visible', editMode);
   
   // Enable/disable widget dragging
   dashboard.querySelectorAll('.widget').forEach(el => {
@@ -829,8 +997,10 @@ function saveWidgetConfig(widget, dialog) {
   widget.width = Math.max(1, parseInt(dialog.querySelector('input[name="width"]').value) || 1);
   widget.height = Math.max(1, parseInt(dialog.querySelector('input[name="height"]').value) || 1);
 
-  // Save widget-specific config
+  // Collect widget-specific config values
   const schema = widget.getConfigSchema();
+  const configValues = {};
+  
   for (const field of schema) {
     if (field.type === 'list') {
       // Collect list items
@@ -848,18 +1018,21 @@ function saveWidgetConfig(widget, dialog) {
         }
         items.push(item);
       });
-      widget.data[field.key] = items;
+      configValues[field.key] = items;
     } else if (field.type === 'boolean') {
       const input = dialog.querySelector(`input[name="config_${field.key}"]`);
-      widget.data[field.key] = input?.checked || false;
+      configValues[field.key] = input?.checked || false;
     } else if (field.type === 'number') {
       const input = dialog.querySelector(`input[name="config_${field.key}"]`);
-      widget.data[field.key] = parseFloat(input?.value) || 0;
+      configValues[field.key] = parseFloat(input?.value) || 0;
     } else {
       const input = dialog.querySelector(`[name="config_${field.key}"]`);
-      widget.data[field.key] = input?.value || '';
+      configValues[field.key] = input?.value || '';
     }
   }
+
+  // Use setConfig to apply values (allows widgets to override and react to changes)
+  widget.setConfig(configValues);
 
   saveWidgets();
   closeWidgetConfig();

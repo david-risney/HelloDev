@@ -6,11 +6,16 @@
  * for native messaging to az cli when token refresh is needed.
  */
 
+import { PromiseCoalescer } from './PromiseCoalescer.js';
+
 const TOKEN_CACHE_KEY = 'ado_auth_token';
 
 // Buffer time before the expiresOn value to ensure we don't expire mid 
 // operation. 1 minute before actual expiration
 const TOKEN_EXPIRY_BUFFER_MS = 60 * 1000;
+
+// Coalescer for token fetch requests
+const tokenFetchCoalescer = new PromiseCoalescer();
 
 class ADOAuthHelper {
   /**
@@ -100,7 +105,8 @@ class ADOAuthHelper {
   
   /**
    * Get a valid access token, refreshing if needed (async)
-   * Uses cached token if valid, otherwise fetches new token via background script
+   * Uses cached token if valid, otherwise fetches new token via background script.
+   * Concurrent calls are coalesced to avoid duplicate token requests.
    * @returns {Promise<string>} The access token
    * @throws {Error} If token cannot be obtained
    */
@@ -116,25 +122,32 @@ class ADOAuthHelper {
     
     console.log('[ADOAuthHelper] No valid cached token, requesting from background...');
     
-    // Need to fetch new token via background script
-    try {
-      const response = await this.sendMessage({ type: 'ADO_GET_TOKEN' });
-      console.log('[ADOAuthHelper] Background response:', 
-        response.accessToken ? 'got token' : 'no token',
-        '| expiresOn:', response.expiresOn);
-      
-      if (response.accessToken && response.expiresOn) {
-        // Cache locally for synchronous access
-        this.cacheToken(response.accessToken, response.expiresOn);
-        console.log('[ADOAuthHelper] Token cached successfully');
-        return response.accessToken;
+    // Coalesce concurrent token fetch requests
+    const { promise, resolve, reject, isFirst } = tokenFetchCoalescer.acquire();
+    
+    if (isFirst) {
+      // This caller is responsible for fetching the token
+      try {
+        const response = await this.sendMessage({ type: 'ADO_GET_TOKEN' });
+        console.log('[ADOAuthHelper] Background response:', 
+          response.accessToken ? 'got token' : 'no token',
+          '| expiresOn:', response.expiresOn);
+        
+        if (response.accessToken && response.expiresOn) {
+          // Cache locally for synchronous access
+          this.cacheToken(response.accessToken, response.expiresOn);
+          console.log('[ADOAuthHelper] Token cached successfully');
+          resolve(response.accessToken);
+        } else {
+          reject(new Error('No access token received. Make sure az cli is installed and you are logged in (az login).'));
+        }
+      } catch (e) {
+        console.error('[ADOAuthHelper] Error from background:', e.message);
+        reject(e);
       }
-    } catch (e) {
-      console.error('[ADOAuthHelper] Error from background:', e.message);
-      throw e;
     }
     
-    throw new Error('No access token received. Make sure az cli is installed and you are logged in (az login).');
+    return promise;
   }
   
   /**
