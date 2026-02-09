@@ -601,7 +601,7 @@ function setupEventListeners() {
 function toggleEditMode() {
   editMode = !editMode;
   editToggle.classList.toggle('active', editMode);
-  editToggle.querySelector('.edit-icon').textContent = editMode ? '✓' : '☰';
+  editToggle.querySelector('.edit-icon').textContent = editMode ? '✖' : '☰';
   editToggle.title = editMode ? 'Done' : 'Menu';
   dashboard.classList.toggle('edit-mode', editMode);
   

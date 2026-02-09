@@ -225,7 +225,7 @@ export class WidgetBase {
     el.style.gridRow = `${this.y + 1} / span ${this.height}`;
 
     el.innerHTML = `
-      <button class="widget-control drag-handle" title="Drag to move">✜</button>
+      <button class="widget-control drag-handle" title="Drag to move">✥</button>
       <button class="widget-control config" title="Configure">⚙</button>
       <button class="widget-control resize-handle" title="Drag to resize">⤢</button>
       <div class="widget-content">
