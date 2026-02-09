@@ -290,7 +290,7 @@ export class ADOPRWidget extends WidgetBase {
     const initials = this.getInitials(pr.createdBy?.displayName || '?');
     
     const avatarHtml = avatarUrl
-      ? `<img class="widget-adopr-avatar" src="${this.escapeHtml(avatarUrl)}" alt="${creator}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span class="widget-adopr-avatar-initials" style="display:none">${initials}</span>`
+      ? `<img class="widget-adopr-avatar" src="${this.escapeHtml(avatarUrl)}" alt="${creator}"><span class="widget-adopr-avatar-initials" style="display:none">${initials}</span>`
       : `<span class="widget-adopr-avatar-initials">${initials}</span>`;
     
     return `
@@ -640,6 +640,12 @@ export class ADOPRWidget extends WidgetBase {
       const contentEl = this.element.querySelector('.widget-content');
       if (contentEl) {
         contentEl.innerHTML = this.getContent();
+        contentEl.querySelectorAll('.widget-adopr-avatar').forEach(img => {
+          img.addEventListener('error', () => {
+            img.style.display = 'none';
+            img.nextElementSibling.style.display = 'flex';
+          });
+        });
       }
     }
   }
