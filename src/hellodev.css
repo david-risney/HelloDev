@@ -721,30 +721,6 @@ body {
   color: var(--text-secondary);
 }
 
-/* Notes Widget */
-.widget-notes textarea {
-  width: 100%;
-  height: calc(100% - 1.5rem);
-  min-height: 100px;
-  background: transparent;
-  border: none;
-  color: var(--text-primary);
-  font-family: inherit;
-  font-size: 0.9rem;
-  resize: none;
-  outline: none;
-}
-
-.widget-notes textarea::placeholder {
-  color: var(--text-secondary);
-}
-
-.widget-notes-title {
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-  margin-bottom: 0.5rem;
-}
-
 /* Quick Links Widget */
 .widget-links-list {
   list-style: none;
@@ -775,12 +751,65 @@ body {
   overflow: hidden;
 }
 
+/* Lock button - bottom left, always visible */
+.widget-markdown .widget-control.lock-toggle {
+  bottom: 0.5rem;
+  left: 0.5rem;
+  top: auto;
+  right: auto;
+  opacity: 0.6;
+  pointer-events: auto;
+}
+
+.widget-markdown .widget-control.lock-toggle:hover {
+  opacity: 1;
+}
+
+/* Mode toggle button - bottom left next to lock, always visible */
+.widget-markdown .widget-control.mode-toggle {
+  bottom: 0.5rem;
+  left: 2.5rem;
+  top: auto;
+  right: auto;
+  opacity: 0.6;
+  pointer-events: auto;
+}
+
+.widget-markdown .widget-control.mode-toggle:hover {
+  opacity: 1;
+}
+
 .widget-markdown-content {
   font-size: 0.9rem;
   line-height: 1.5;
   overflow-y: auto;
   height: 100%;
   user-select: text;
+  outline: none;
+  cursor: text;
+}
+
+.widget-markdown-content:focus {
+  outline: none;
+}
+
+/* Markdown source view (editable textarea) */
+.widget-markdown-source {
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  overflow: auto;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  color: var(--text-primary);
+  background: transparent;
+  border: none;
+  outline: none;
+  resize: none;
 }
 
 .widget-markdown-content h1 {
@@ -866,6 +895,17 @@ body {
 
 .widget-markdown-content li {
   margin: 0.25rem 0;
+}
+
+.widget-markdown-content li.has-checkbox {
+  list-style: none;
+  margin-left: -1.25rem;
+}
+
+.widget-markdown-content li input[type="checkbox"] {
+  margin-right: 0.5rem;
+  accent-color: var(--accent);
+  pointer-events: auto;
 }
 
 .widget-markdown-content blockquote {

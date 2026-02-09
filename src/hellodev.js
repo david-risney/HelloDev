@@ -556,6 +556,11 @@ function setupEventListeners() {
   // Edit mode toggle
   editToggle.addEventListener('click', toggleEditMode);
   
+  // Listen for widget content changes (e.g., markdown edits)
+  dashboard.addEventListener('widget-changed', () => {
+    saveWidgets();
+  });
+  
   // Add widget button
   addWidgetBtn.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -752,7 +757,11 @@ function addWidget(type) {
   const pos = findNextPosition();
   
   // Check if there's an existing widget of the same type to copy properties from
-  const existingWidget = widgets.find(w => w.type === type);
+  // Use the latest (last) widget of this type
+  const existingWidgetsOfType = widgets.filter(w => w.type === type);
+  const existingWidget = existingWidgetsOfType.length > 0 
+    ? existingWidgetsOfType[existingWidgetsOfType.length - 1] 
+    : null;
   
   // Copy size from existing widget, or use default size from widget class
   let width, height, data;

@@ -1,4 +1,5 @@
 import { WidgetBase } from './WidgetBase.js';
+import { MarkdownHelper } from '../MarkdownHelper.js';
 
 /**
  * Markdown widget - displays rendered markdown content
@@ -15,6 +16,10 @@ export class MarkdownWidget extends WidgetBase {
     if (!this.data.markdown) {
       this.data.markdown = '# Hello\n\nEdit this widget to add your **markdown** content.';
     }
+    // Track current view mode: 'rendered' or 'source' (persisted)
+    this.viewMode = this.data.viewMode || 'rendered';
+    // Track lock state: locked = not editable (persisted)
+    this.isLocked = this.data.isLocked !== undefined ? this.data.isLocked : true;
   }
 
   getConfigSchema() {
@@ -29,138 +34,140 @@ export class MarkdownWidget extends WidgetBase {
   }
 
   getContent() {
-    const html = this.parseMarkdown(this.data.markdown || '');
-    return `<div class="widget-markdown-content">${html}</div>`;
-  }
-
-  /**
-   * Simple markdown parser - converts markdown to HTML
-   * Supports: headings, bold, italic, links, lists (with sublists), code, blockquotes, horizontal rules
-   */
-  parseMarkdown(markdown) {
-    const lines = markdown.split('\n');
-    const result = [];
-    let i = 0;
-
-    while (i < lines.length) {
-      const line = lines[i];
-      
-      // Check for list items (unordered or ordered)
-      const listMatch = line.match(/^(\s*)([-*]|\d+\.)\s+(.+)$/);
-      if (listMatch) {
-        const { html, endIndex } = this.parseList(lines, i);
-        result.push(html);
-        i = endIndex;
-        continue;
-      }
-
-      // Process other line types
-      result.push(this.parseLine(line));
-      i++;
+    const markdown = this.data.markdown || '';
+    if (this.viewMode === 'source') {
+      // Show markdown source - editable only when unlocked
+      const escaped = markdown
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+      const readonlyAttr = this.isLocked ? ' readonly' : '';
+      return `<textarea class="widget-markdown-source"${readonlyAttr} spellcheck="false">${escaped}</textarea>`;
     }
-
-    let html = result.join('\n')
-      // Fix nested blockquotes
-      .replace(/<\/blockquote>\n<blockquote>/g, '<br>');
-
-    return html;
+    const html = MarkdownHelper.toHtml(markdown);
+    const editableAttr = this.isLocked ? 'false' : 'true';
+    return `<div class="widget-markdown-content" contenteditable="${editableAttr}" spellcheck="false">${html}</div>`;
   }
 
   /**
-   * Parse a list starting at the given index
+   * Override createElement to add lock and mode toggle buttons
    */
-  parseList(lines, startIndex) {
-    const items = [];
-    let i = startIndex;
-    const firstMatch = lines[i].match(/^(\s*)([-*]|\d+\.)\s+(.+)$/);
-    const baseIndent = firstMatch[1].length;
-    const isOrdered = /^\d+\./.test(firstMatch[2]);
+  createElement(removeWidget, resizeWidget, openWidgetConfig) {
+    const el = super.createElement(removeWidget, resizeWidget, openWidgetConfig);
+    
+    // Add lock/unlock button (leftmost)
+    const lockBtn = document.createElement('button');
+    lockBtn.className = 'widget-control lock-toggle';
+    lockBtn.title = this.isLocked ? 'Unlock to edit' : 'Lock editing';
+    lockBtn.textContent = this.isLocked ? '\uD83D\uDD12' : '\uD83D\uDD13';
+    el.insertBefore(lockBtn, el.firstChild);
+    
+    // Add mode toggle button (next to lock)
+    const toggleBtn = document.createElement('button');
+    toggleBtn.className = 'widget-control mode-toggle';
+    toggleBtn.title = 'Toggle view mode';
+    toggleBtn.textContent = this.viewMode === 'rendered' ? '\uD83D\uDCDD' : '\uD83D\uDC40';
+    el.insertBefore(toggleBtn, el.firstChild);
+    
+    // Add click handler for lock button
+    lockBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.toggleLock();
+    });
+    
+    // Add click handler for toggle button
+    toggleBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.toggleViewMode();
+    });
+    
+    // Auto-save on blur for both rendered and source modes
+    el.addEventListener('focusout', (e) => {
+      // Only save if the focus is leaving the editable content
+      const content = el.querySelector('.widget-content');
+      if (content && !content.contains(e.relatedTarget)) {
+        this.saveContent();
+      }
+    });
+    
+    return el;
+  }
 
-    while (i < lines.length) {
-      const line = lines[i];
-      const match = line.match(/^(\s*)([-*]|\d+\.)\s+(.+)$/);
-      
-      if (!match) break;
-      
-      const indent = match[1].length;
-      
-      if (indent < baseIndent) break;
-      
-      if (indent === baseIndent) {
-        // Same level item
-        items.push({ content: this.parseInline(match[3]), children: null });
-        i++;
-      } else {
-        // Sublist - parse recursively
-        const { html, endIndex } = this.parseList(lines, i);
-        if (items.length > 0) {
-          items[items.length - 1].children = html;
+  /**
+   * Save current content to data and trigger storage save
+   */
+  saveContent() {
+    if (this.viewMode === 'source') {
+      const textarea = this.element?.querySelector('.widget-markdown-source');
+      if (textarea && textarea.value !== this.data.markdown) {
+        this.data.markdown = textarea.value;
+        this.element?.dispatchEvent(new CustomEvent('widget-changed', { bubbles: true }));
+      }
+    } else {
+      const contentEl = this.element?.querySelector('.widget-markdown-content');
+      if (contentEl) {
+        const newMarkdown = MarkdownHelper.toMarkdown(contentEl);
+        if (newMarkdown !== this.data.markdown) {
+          this.data.markdown = newMarkdown;
+          this.element?.dispatchEvent(new CustomEvent('widget-changed', { bubbles: true }));
         }
-        i = endIndex;
       }
     }
-
-    const tag = isOrdered ? 'ol' : 'ul';
-    const listHtml = items.map(item => {
-      if (item.children) {
-        return `<li>${item.content}\n${item.children}</li>`;
-      }
-      return `<li>${item.content}</li>`;
-    }).join('\n');
-
-    return { html: `<${tag}>${listHtml}</${tag}>`, endIndex: i };
   }
 
   /**
-   * Parse a single line (non-list)
+   * Toggle between rendered and source view modes
    */
-  parseLine(line) {
-    // Escape HTML first
-    let escaped = line
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;');
-
-    // Headings
-    if (/^##### (.+)$/.test(escaped)) return escaped.replace(/^##### (.+)$/, '<h5>$1</h5>');
-    if (/^#### (.+)$/.test(escaped)) return escaped.replace(/^#### (.+)$/, '<h4>$1</h4>');
-    if (/^### (.+)$/.test(escaped)) return escaped.replace(/^### (.+)$/, '<h3>$1</h3>');
-    if (/^## (.+)$/.test(escaped)) return escaped.replace(/^## (.+)$/, '<h2>$1</h2>');
-    if (/^# (.+)$/.test(escaped)) return escaped.replace(/^# (.+)$/, '<h1>$1</h1>');
-
-    // Horizontal rule
-    if (/^---$/.test(escaped)) return '<hr>';
-
-    // Blockquote
-    if (/^&gt; (.+)$/.test(escaped)) return escaped.replace(/^&gt; (.+)$/, '<blockquote>$1</blockquote>');
-
-    // Empty line
-    if (escaped.trim() === '') return '';
-
-    // Paragraph with inline formatting
-    return `<p>${this.parseInline(escaped)}</p>`;
+  toggleViewMode() {
+    // Save content before switching modes
+    this.saveContent();
+    
+    this.viewMode = this.viewMode === 'rendered' ? 'source' : 'rendered';
+    this.data.viewMode = this.viewMode;
+    
+    // Update button icon
+    const toggleBtn = this.element?.querySelector('.widget-control.mode-toggle');
+    if (toggleBtn) {
+      toggleBtn.textContent = this.viewMode === 'rendered' ? '\uD83D\uDCDD' : '\uD83D\uDC40';
+      toggleBtn.title = this.viewMode === 'rendered' ? 'View source' : 'View rendered';
+    }
+    
+    // Re-render content
+    const contentEl = this.element?.querySelector('.widget-content');
+    if (contentEl) {
+      contentEl.innerHTML = this.getContent();
+    }
+    
+    // Save state
+    this.element?.dispatchEvent(new CustomEvent('widget-changed', { bubbles: true }));
   }
 
   /**
-   * Parse inline formatting (bold, italic, code, links)
+   * Toggle lock/unlock state
    */
-  parseInline(text) {
-    return text
-      // Escape HTML if not already escaped
-      .replace(/&(?!amp;|lt;|gt;)/g, '&amp;')
-      
-      // Bold and italic
-      .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
-      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-      .replace(/\*(.+?)\*/g, '<em>$1</em>')
-      .replace(/___(.+?)___/g, '<strong><em>$1</em></strong>')
-      .replace(/__(.+?)__/g, '<strong>$1</strong>')
-      .replace(/_(.+?)_/g, '<em>$1</em>')
-      
-      // Inline code
-      .replace(/`(.+?)`/g, '<code>$1</code>')
-      
-      // Links
-      .replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2" target="_blank">$1</a>');
+  toggleLock() {
+    // Save content before locking
+    if (!this.isLocked) {
+      this.saveContent();
+    }
+    
+    this.isLocked = !this.isLocked;
+    this.data.isLocked = this.isLocked;
+    
+    // Update button icon
+    const lockBtn = this.element?.querySelector('.widget-control.lock-toggle');
+    if (lockBtn) {
+      lockBtn.textContent = this.isLocked ? '\uD83D\uDD12' : '\uD83D\uDD13';
+      lockBtn.title = this.isLocked ? 'Unlock to edit' : 'Lock editing';
+    }
+    
+    // Re-render content with new editability
+    const contentEl = this.element?.querySelector('.widget-content');
+    if (contentEl) {
+      contentEl.innerHTML = this.getContent();
+    }
+    
+    // Save state
+    this.element?.dispatchEvent(new CustomEvent('widget-changed', { bubbles: true }));
   }
 }
