@@ -1,12 +1,10 @@
-import { WidgetBase } from './WidgetBase.js';
-import { ADOAuthHelper } from '../ADOAuthHelper.js';
-import { TimeFormatter } from '../TimeFormatter.js';
+import { ADOWidgetBase } from './ADOWidgetBase.js';
 
 /**
- * Azure DevOps Pull Request widget - displays a list of PRs
- * Uses native messaging with az cli for authentication
+ * Azure DevOps Pull Request widget - displays a list of PRs.
+ * Uses native messaging with az cli for authentication.
  */
-export class ADOPRWidget extends WidgetBase {
+export class ADOPRWidget extends ADOWidgetBase {
   static metadata = {
     name: 'ADO PRs',
     icon: '🔀',
@@ -15,93 +13,38 @@ export class ADOPRWidget extends WidgetBase {
 
   constructor(config) {
     super({ ...config, type: 'adopr' });
-    this.prs = [];
-    this.loading = false;
-    this.loadingStatus = '';       // Current loading sub-activity
-    this.error = null;             // { message: string, details?: string } | null
-    this.errorDialogOpen = false;
-    this.lastFetched = null;      // Timestamp for display (includes cache restore)
-    this.lastServerFetch = null;  // Timestamp of actual server fetch (for auto-refresh)
-    this.intervalId = null;
-    
-    // Apply defaults
-    this.data.organization ??= '';
-    this.data.project ??= '';
+  }
+
+  applyDefaults() {
     this.data.repository ??= '';
     this.data.status ??= 'active';
-    this.data.maxCount ??= 10;
-    this.data.refreshInterval ??= 60;
     this.data.creatorEmail ??= '';
     this.data.reviewerEmail ??= '';
     this.data.targetBranch ??= '';
     this.data.titleText ??= '';
-    this.data.title ??= '';
-    this.data.maxAgeDays ??= 0;
-    
-    // Cache for resolved user IDs
-    this._userIdCache = {};
-    
-    this.restoreFromCache();
-  }
-  
-  get isConfigured() {
-    return this.data.organization && this.data.project;
-  }
-  
-  getCacheKey() {
-    return `adopr_cache_${this.id}`;
-  }
-  
-  restoreFromCache() {
-    try {
-      const cached = localStorage.getItem(this.getCacheKey());
-      if (cached) {
-        const data = JSON.parse(cached);
-        if (Array.isArray(data.prs)) {
-          this.prs = data.prs;
-          this.lastFetched = data.lastFetched || null;
-        }
-      }
-    } catch (e) {
-      console.error('[ADOPRWidget] Cache restore error:', e);
-    }
-  }
-  
-  saveToCache() {
-    try {
-      localStorage.setItem(this.getCacheKey(), JSON.stringify({
-        prs: this.prs,
-        lastFetched: this.lastFetched
-      }));
-    } catch (e) {
-      console.error('[ADOPRWidget] Cache save error:', e);
-    }
   }
 
-  getConfigSchema() {
+  getCachePrefix() { return 'adopr'; }
+  getDefaultTitle() { return 'Pull Requests'; }
+  getEmptyMessage() { return 'No pull requests found'; }
+  getConfigureMessage() { return 'Configure organization and project to see PRs'; }
+
+  getItemDateField(item) {
+    return item.creationDate;
+  }
+
+  getTitleUrl() {
+    if (!this.data.repository) return null;
+    const org = encodeURIComponent(this.data.organization);
+    const project = encodeURIComponent(this.data.project);
+    return `https://dev.azure.com/${org}/${project}/_git/${encodeURIComponent(this.data.repository)}/pullrequests`;
+  }
+
+  getItemSpecificConfigSchema() {
     return [
+      { key: 'repository', label: 'Repository (optional)', type: 'string', default: '' },
       {
-        key: 'organization',
-        label: 'Organization',
-        type: 'string',
-        default: ''
-      },
-      {
-        key: 'project',
-        label: 'Project',
-        type: 'string',
-        default: ''
-      },
-      {
-        key: 'repository',
-        label: 'Repository (optional)',
-        type: 'string',
-        default: ''
-      },
-      {
-        key: 'status',
-        label: 'PR Status',
-        type: 'select',
+        key: 'status', label: 'PR Status', type: 'select',
         options: [
           { value: 'active', label: 'Active' },
           { value: 'completed', label: 'Completed' },
@@ -110,193 +53,108 @@ export class ADOPRWidget extends WidgetBase {
         ],
         default: 'active'
       },
-      {
-        key: 'maxCount',
-        label: 'Max PRs to Show',
-        type: 'number',
-        default: 10
-      },
-      {
-        key: 'refreshInterval',
-        label: 'Auto Refresh (minutes, 0 = disabled)',
-        type: 'number',
-        default: 60
-      },
-      {
-        key: 'creatorEmail',
-        label: 'Creator Email (optional)',
-        type: 'string',
-        default: ''
-      },
-      {
-        key: 'reviewerEmail',
-        label: 'Reviewer Email (optional)',
-        type: 'string',
-        default: ''
-      },
-      {
-        key: 'targetBranch',
-        label: 'Target Branch (optional, e.g. main)',
-        type: 'string',
-        default: ''
-      },
-      {
-        key: 'titleText',
-        label: 'Title Contains (optional)',
-        type: 'string',
-        default: ''
-      },
-      {
-        key: 'title',
-        label: 'Widget Title (optional)',
-        type: 'string',
-        default: ''
-      },
-      {
-        key: 'maxAgeDays',
-        label: 'Max Age in Days (0 = no limit)',
-        type: 'number',
-        default: 0
-      }
+      { key: 'creatorEmail', label: 'Creator Email (optional)', type: 'string', default: '' },
+      { key: 'reviewerEmail', label: 'Reviewer Email (optional)', type: 'string', default: '' },
+      { key: 'targetBranch', label: 'Target Branch (optional, e.g. main)', type: 'string', default: '' },
+      { key: 'titleText', label: 'Title Contains (optional)', type: 'string', default: '' }
     ];
   }
 
-  /**
-   * Override setConfig to clear cache and refresh when config changes.
-   */
-  setConfig(values) {
-    super.setConfig(values);
-    
-    // Clear cached data
-    this.prs = [];
-    this.lastFetched = null;
-    this.lastServerFetch = null;
-    localStorage.removeItem(this.getCacheKey());
-    
-    // Refresh if configured
-    if (this.isConfigured && this.element) {
-      this.fetchPRs();
-    }
-  }
+  async fetchItems(accessToken) {
+    let creatorId = null;
+    let reviewerId = null;
 
-  getContent() {
-    if (!this.isConfigured) {
-      return `
-        <div class="widget-adopr-empty">
-          <div class="widget-adopr-icon">🔧</div>
-          <p>Configure organization and project to see PRs</p>
-        </div>
-      `;
+    if (this.data.creatorEmail) {
+      this.loadingStatus = 'Looking up creator...';
+      this.updateContent();
+      creatorId = await this.resolveUserId(this.data.creatorEmail, accessToken);
+      if (!creatorId) {
+        throw new Error(`Could not resolve creator email: ${this.data.creatorEmail}`);
+      }
     }
 
-    const lastFetchedStr = this.lastFetched 
-      ? TimeFormatter.formatRelative(this.lastFetched)
-      : '';
-
-    const displayTitle = this.escapeHtml(this.data.title || 'Pull Requests');
-    const titleHtml = this.data.repository
-      ? `<a href="${this.getPRListUrl()}" target="_blank" class="widget-adopr-title-link">${displayTitle}</a>`
-      : `<span class="widget-adopr-title">${displayTitle}</span>`;
-
-    // Status indicator in upper right
-    let statusHtml = '';
-    if (this.loading) {
-      statusHtml = `<span class="widget-adopr-status-indicator widget-adopr-status-loading" title="${this.loadingStatus || 'Loading...'}">⟳</span>`;
-    } else if (this.error) {
-      statusHtml = `<button class="widget-adopr-status-indicator widget-adopr-status-error widget-adopr-error-btn" title="Click to see error details">⚠️</button>`;
+    if (this.data.reviewerEmail) {
+      this.loadingStatus = 'Looking up reviewer...';
+      this.updateContent();
+      reviewerId = await this.resolveUserId(this.data.reviewerEmail, accessToken);
+      if (!reviewerId) {
+        throw new Error(`Could not resolve reviewer email: ${this.data.reviewerEmail}`);
+      }
     }
 
-    // Error dialog
-    let errorDialogHtml = '';
-    if (this.error && this.errorDialogOpen) {
-      const errorMessage = this.escapeHtml(this.error.message || this.error);
-      const errorDetails = this.error.details ? `<pre class="widget-adopr-error-details">${this.escapeHtml(this.error.details)}</pre>` : '';
-      errorDialogHtml = `
-        <div class="widget-adopr-error-dialog">
-          <div class="widget-adopr-error-dialog-header">
-            <span>Error</span>
-            <button class="widget-adopr-error-dialog-close" title="Close">✕</button>
-          </div>
-          <div class="widget-adopr-error-dialog-content">
-            <p class="widget-adopr-error-message">${errorMessage}</p>
-            ${errorDetails}
-          </div>
-          <div class="widget-adopr-error-dialog-actions">
-            <button class="widget-adopr-retry">Retry</button>
-          </div>
-        </div>
-      `;
-    }
+    this.loadingStatus = 'Fetching pull requests...';
+    this.updateContent();
 
-    // Filter PRs by age if configured
-    const filteredPRs = this.getFilteredPRs();
-
-    // Show list content or empty state
-    let listContent;
-    if (filteredPRs.length === 0 && !this.loading) {
-      listContent = `
-        <div class="widget-adopr-empty">
-          <div class="widget-adopr-icon">✓</div>
-          <p>No pull requests found</p>
-        </div>
-      `;
-    } else {
-      listContent = `
-        <ul class="widget-adopr-list">
-          ${filteredPRs.map(pr => this.renderPR(pr)).join('')}
-        </ul>
-      `;
-    }
-
-    return `
-      <div class="widget-adopr-header">
-        ${titleHtml}
-        <span class="widget-adopr-last-updated" title="Last updated">${lastFetchedStr}</span>
-        ${statusHtml}
-        <button class="widget-adopr-refresh" title="Reload">⟳</button>
-      </div>
-      ${listContent}
-      ${errorDialogHtml}
-    `;
-  }
-
-  getFilteredPRs() {
-    if (!this.data.maxAgeDays || this.data.maxAgeDays <= 0) {
-      return this.prs;
-    }
-    
-    const maxAgeMs = this.data.maxAgeDays * 24 * 60 * 60 * 1000;
-    const cutoffTime = Date.now() - maxAgeMs;
-    
-    return this.prs.filter(pr => {
-      if (!pr.creationDate) return true;
-      const createdTime = new Date(pr.creationDate).getTime();
-      return createdTime >= cutoffTime;
+    const response = await fetch(this.buildApiUrl(creatorId, reviewerId), {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      }
     });
+
+    if (!response.ok) {
+      if (response.status === 401) throw new Error('Authentication failed. Try running: az login');
+      if (response.status === 404) throw new Error('Project or repository not found.');
+      throw new Error(`API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    return (data.value || []).map(pr => ({
+      ...pr,
+      url: `https://dev.azure.com/${this.data.organization}/${this.data.project}/_git/${pr.repository?.name || ''}/pullrequest/${pr.pullRequestId}`
+    }));
   }
 
-  getPRListUrl() {
+  buildApiUrl(creatorId, reviewerId) {
     const org = encodeURIComponent(this.data.organization);
     const project = encodeURIComponent(this.data.project);
-    return `https://dev.azure.com/${org}/${project}/_git/${encodeURIComponent(this.data.repository)}/pullrequests`;
+
+    let url = this.data.repository
+      ? `https://dev.azure.com/${org}/${project}/_apis/git/repositories/${encodeURIComponent(this.data.repository)}/pullrequests`
+      : `https://dev.azure.com/${org}/${project}/_apis/git/pullrequests`;
+
+    url += '?api-version=7.0';
+    if (this.data.status && this.data.status !== 'all') {
+      url += `&searchCriteria.status=${this.data.status}`;
+    }
+    url += `&$top=${this.data.maxCount || 10}`;
+
+    if (creatorId) {
+      url += `&searchCriteria.creatorId=${encodeURIComponent(creatorId)}`;
+    }
+    if (reviewerId) {
+      url += `&searchCriteria.reviewerId=${encodeURIComponent(reviewerId)}`;
+    }
+    if (this.data.targetBranch) {
+      const branchRef = this.data.targetBranch.startsWith('refs/')
+        ? this.data.targetBranch
+        : `refs/heads/${this.data.targetBranch}`;
+      url += `&searchCriteria.targetRefName=${encodeURIComponent(branchRef)}`;
+    }
+    if (this.data.titleText) {
+      url += `&searchCriteria.title=${encodeURIComponent(this.data.titleText)}`;
+    }
+
+    return url;
   }
 
-  renderPR(pr) {
+  renderItem(pr) {
     const statusClass = this.getStatusClass(pr.status);
     const reviewerStatus = this.getReviewerStatusIcon(pr);
     const age = this.formatAge(pr.creationDate);
     const creator = this.escapeHtml(pr.createdBy?.displayName || 'Unknown');
     const avatarUrl = pr.createdBy?.imageUrl;
     const initials = this.getInitials(pr.createdBy?.displayName || '?');
-    
+
     const avatarHtml = avatarUrl
-      ? `<img class="widget-adopr-avatar" src="${this.escapeHtml(avatarUrl)}" alt="${creator}"><span class="widget-adopr-avatar-initials" style="display:none">${initials}</span>`
-      : `<span class="widget-adopr-avatar-initials">${initials}</span>`;
-    
+      ? `<img class="ado-widget-avatar" src="${this.escapeHtml(avatarUrl)}" alt="${creator}"><span class="ado-widget-avatar-initials" style="display:none">${initials}</span>`
+      : `<span class="ado-widget-avatar-initials">${initials}</span>`;
+
     return `
-      <li class="widget-adopr-item ${statusClass}">
-        <a href="${pr.url}" target="_blank" class="widget-adopr-link">
-          <div class="widget-adopr-avatar-container">
+      <li class="ado-widget-item ${statusClass}">
+        <a href="${pr.url}" target="_blank" class="ado-widget-link">
+          <div class="ado-widget-avatar-container">
             ${avatarHtml}
           </div>
           <div class="widget-adopr-pr-content">
@@ -315,19 +173,6 @@ export class ADOPRWidget extends WidgetBase {
     `;
   }
 
-  getInitials(name) {
-    if (!name) return '?';
-    const parts = name.trim().split(/\s+/);
-    if (parts.length === 1) {
-      return parts[0].substring(0, 2).toUpperCase();
-    }
-    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-  }
-
-  formatAge(dateString) {
-    return TimeFormatter.formatRelative(dateString);
-  }
-
   getStatusClass(status) {
     const classes = {
       active: 'status-active',
@@ -341,312 +186,11 @@ export class ADOPRWidget extends WidgetBase {
     if (pr.reviewers && pr.reviewers.length > 0) {
       const hasApproval = pr.reviewers.some(r => r.vote > 0);
       const hasRejection = pr.reviewers.some(r => r.vote < 0);
-      
+
       if (hasRejection) return '❌';
       if (hasApproval) return '✓';
       return '⏳';
     }
     return '👁';
-  }
-
-  escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-  }
-
-  setupBehavior(element) {
-    element.addEventListener('click', (e) => {
-      if (e.target.classList.contains('widget-adopr-refresh') || 
-          e.target.classList.contains('widget-adopr-retry')) {
-        e.preventDefault();
-        e.stopPropagation();
-        this.errorDialogOpen = false;
-        this.fetchPRs();
-      }
-      
-      // Toggle error dialog
-      if (e.target.classList.contains('widget-adopr-error-btn')) {
-        e.preventDefault();
-        e.stopPropagation();
-        this.errorDialogOpen = !this.errorDialogOpen;
-        this.updateContent();
-      }
-      
-      // Close error dialog
-      if (e.target.classList.contains('widget-adopr-error-dialog-close')) {
-        e.preventDefault();
-        e.stopPropagation();
-        this.errorDialogOpen = false;
-        this.updateContent();
-      }
-    });
-
-    if (this.isConfigured) {
-      if (!this.lastFetched) {
-        this.fetchPRs();
-      } else {
-        this.updateContent();
-      }
-    }
-    
-    this.startAutoRefresh();
-  }
-  
-  startAutoRefresh() {
-    if (this.intervalId) clearInterval(this.intervalId);
-    
-    this.intervalId = setInterval(() => {
-      if (!this.isConfigured) return;
-      if (!this.data.refreshInterval || this.data.refreshInterval <= 0) return;
-
-      const intervalMs = this.data.refreshInterval * 60 * 1000;
-      if (!this.lastServerFetch || (Date.now() - this.lastServerFetch) >= intervalMs) {
-        this.fetchPRs();
-      }
-    }, 60000);
-  }
-  
-  destroy() {
-    if (this.intervalId) {
-      clearInterval(this.intervalId);
-      this.intervalId = null;
-    }
-  }
-  
-  buildApiUrl(creatorId, reviewerId) {
-    const org = encodeURIComponent(this.data.organization);
-    const project = encodeURIComponent(this.data.project);
-    
-    let url = this.data.repository
-      ? `https://dev.azure.com/${org}/${project}/_apis/git/repositories/${encodeURIComponent(this.data.repository)}/pullrequests`
-      : `https://dev.azure.com/${org}/${project}/_apis/git/pullrequests`;
-    
-    url += '?api-version=7.0';
-    if (this.data.status && this.data.status !== 'all') {
-      url += `&searchCriteria.status=${this.data.status}`;
-    }
-    url += `&$top=${this.data.maxCount || 10}`;
-    
-    // Add creator filter
-    if (creatorId) {
-      url += `&searchCriteria.creatorId=${encodeURIComponent(creatorId)}`;
-    }
-    
-    // Add reviewer filter
-    if (reviewerId) {
-      url += `&searchCriteria.reviewerId=${encodeURIComponent(reviewerId)}`;
-    }
-    
-    // Add target branch filter
-    if (this.data.targetBranch) {
-      const branchRef = this.data.targetBranch.startsWith('refs/') 
-        ? this.data.targetBranch 
-        : `refs/heads/${this.data.targetBranch}`;
-      url += `&searchCriteria.targetRefName=${encodeURIComponent(branchRef)}`;
-    }
-    
-    // Add title text filter
-    if (this.data.titleText) {
-      url += `&searchCriteria.title=${encodeURIComponent(this.data.titleText)}`;
-    }
-    
-    return url;
-  }
-
-  /**
-   * Look up a user's GUID by email or display name
-   */
-  async resolveUserId(emailOrName, accessToken) {
-    if (!emailOrName) return null;
-    
-    // Check cache first
-    if (this._userIdCache[emailOrName]) {
-      return this._userIdCache[emailOrName];
-    }
-    
-    const org = encodeURIComponent(this.data.organization);
-    
-    // Use the Graph API to search for users
-    // The subjectQuery parameter searches across display name and email
-    const url = `https://vssps.dev.azure.com/${org}/_apis/graph/users?api-version=7.0-preview.1&subjectTypes=aad,msa&$top=10`;
-    
-    try {
-      const response = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      if (!response.ok) {
-        console.warn(`[ADOPRWidget] Failed to search users: ${response.status}`);
-        return null;
-      }
-      
-      const data = await response.json();
-      const users = data.value || [];
-      
-      // Find user by email (principalName) or display name
-      const searchLower = emailOrName.toLowerCase();
-      const user = users.find(u => 
-        u.principalName?.toLowerCase() === searchLower ||
-        u.displayName?.toLowerCase() === searchLower ||
-        u.mailAddress?.toLowerCase() === searchLower
-      );
-      
-      if (user) {
-        // Extract the user ID from the descriptor or use originId
-        // The descriptor format is typically: aad.{base64-encoded-id}
-        const userId = user.originId || user.descriptor;
-        this._userIdCache[emailOrName] = userId;
-        return userId;
-      }
-      
-      // If exact match not found, try a more specific search using identities API
-      return await this.resolveUserIdViaIdentities(emailOrName, accessToken);
-    } catch (err) {
-      console.warn(`[ADOPRWidget] Error resolving user '${emailOrName}':`, err);
-      return null;
-    }
-  }
-
-  /**
-   * Fallback user lookup using the identities API
-   */
-  async resolveUserIdViaIdentities(emailOrName, accessToken) {
-    const org = encodeURIComponent(this.data.organization);
-    const url = `https://vssps.dev.azure.com/${org}/_apis/identities?api-version=7.0&searchFilter=General&filterValue=${encodeURIComponent(emailOrName)}`;
-    
-    try {
-      const response = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      if (!response.ok) return null;
-      
-      const data = await response.json();
-      const identities = data.value || [];
-      
-      if (identities.length > 0) {
-        const userId = identities[0].id;
-        this._userIdCache[emailOrName] = userId;
-        return userId;
-      }
-      
-      return null;
-    } catch (err) {
-      console.warn(`[ADOPRWidget] Error in identity lookup:`, err);
-      return null;
-    }
-  }
-
-  async fetchPRs() {
-    if (this.loading || !this.isConfigured) return;
-
-    this.loading = true;
-    this.loadingStatus = 'Obtaining access token...';
-    this.error = null;
-    this.updateContent();
-
-    try {
-      const accessToken = await ADOAuthHelper.getToken();
-
-      // Resolve user IDs if email filters are configured
-      let creatorId = null;
-      let reviewerId = null;
-      
-      if (this.data.creatorEmail) {
-        this.loadingStatus = 'Looking up creator...';
-        this.updateContent();
-        creatorId = await this.resolveUserId(this.data.creatorEmail, accessToken);
-        if (!creatorId) {
-          throw new Error(`Could not resolve creator email: ${this.data.creatorEmail}`);
-        }
-      }
-      
-      if (this.data.reviewerEmail) {
-        this.loadingStatus = 'Looking up reviewer...';
-        this.updateContent();
-        reviewerId = await this.resolveUserId(this.data.reviewerEmail, accessToken);
-        if (!reviewerId) {
-          throw new Error(`Could not resolve reviewer email: ${this.data.reviewerEmail}`);
-        }
-      }
-
-      this.loadingStatus = 'Fetching pull requests...';
-      this.updateContent();
-
-      const response = await fetch(this.buildApiUrl(creatorId, reviewerId), {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        if (response.status === 401) throw new Error('Authentication failed. Try running: az login');
-        if (response.status === 404) throw new Error('Project or repository not found.');
-        throw new Error(`API error: ${response.status}`);
-      }
-
-      const data = await response.json();
-      
-      this.prs = (data.value || []).map(pr => ({
-        ...pr,
-        url: `https://dev.azure.com/${this.data.organization}/${this.data.project}/_git/${pr.repository?.name || ''}/pullrequest/${pr.pullRequestId}`
-      }));
-      
-      this.lastFetched = Date.now();
-      this.lastServerFetch = this.lastFetched;
-      this.saveToCache();
-    } catch (err) {
-      const originalError = err.details 
-        ? `\n\n--- Original Error ---\n${err.details}`
-        : `\n\n--- Original Error ---\n${err.message || 'Unknown error'}\n${err.stack || ''}`;
-      
-      // Check if we're offline
-      if (!navigator.onLine) {
-        this.error = {
-          message: 'You appear to be offline',
-          details: 'Please check your internet connection and try again. Cached data (if available) is still being displayed.' + originalError
-        };
-      } else if (err.name === 'TypeError' && err.message.includes('fetch')) {
-        // Network error while online - could be DNS, firewall, etc.
-        this.error = {
-          message: 'Network error',
-          details: 'Could not connect to Azure DevOps. This may be a DNS issue, firewall blocking the connection, or the service may be temporarily unavailable.' + originalError
-        };
-      } else {
-        this.error = {
-          message: err.message || 'Failed to fetch PRs',
-          details: err.details || err.stack || null
-        };
-      }
-      this.errorDialogOpen = true;
-      ADOAuthHelper.handleAuthError(this.error.message);
-    } finally {
-      this.loading = false;
-      this.loadingStatus = '';
-      this.updateContent();
-    }
-  }
-
-  updateContent() {
-    if (this.element) {
-      const contentEl = this.element.querySelector('.widget-content');
-      if (contentEl) {
-        contentEl.innerHTML = this.getContent();
-        contentEl.querySelectorAll('.widget-adopr-avatar').forEach(img => {
-          img.addEventListener('error', () => {
-            img.style.display = 'none';
-            img.nextElementSibling.style.display = 'flex';
-          });
-        });
-      }
-    }
   }
 }
