@@ -676,23 +676,304 @@ body {
   text-align: center;
 }
 
+.widget-clock .clock-display {
+  --scale: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
 .widget-clock .greeting {
-  font-size: 1.5rem;
+  font-size: calc(1.5rem * var(--scale));
   font-weight: 300;
   color: var(--text-secondary);
-  margin-bottom: 0.25rem;
+  margin-bottom: calc(0.25rem * var(--scale));
 }
 
 .widget-clock .time {
-  font-size: 3rem;
+  font-size: calc(3rem * var(--scale));
   font-weight: 300;
   line-height: 1;
 }
 
 .widget-clock .date {
-  font-size: 1rem;
+  font-size: calc(1rem * var(--scale));
   color: var(--text-secondary);
-  margin-top: 0.5rem;
+  margin-top: calc(0.5rem * var(--scale));
+}
+
+/* Clock Style: Minimal - hide greeting and date, larger time */
+.widget-clock .style-minimal .greeting,
+.widget-clock .style-minimal .date {
+  display: none;
+}
+
+.widget-clock .style-minimal .time {
+  font-size: calc(4rem * var(--scale));
+  font-weight: 200;
+}
+
+/* Clock Style: Compact - smaller, tighter layout */
+.widget-clock .style-compact .greeting {
+  font-size: calc(1rem * var(--scale));
+  margin-bottom: calc(0.125rem * var(--scale));
+}
+
+.widget-clock .style-compact .time {
+  font-size: calc(2rem * var(--scale));
+}
+
+.widget-clock .style-compact .date {
+  font-size: calc(0.85rem * var(--scale));
+  margin-top: calc(0.25rem * var(--scale));
+}
+
+/* Clock Style: Digital - 7-segment LED style using CSS segments */
+.widget-clock .style-digital {
+  --scale: 1;
+  padding: calc(1rem * var(--scale)) calc(1.5rem * var(--scale));
+}
+
+.widget-clock .style-digital .greeting {
+  display: none;
+}
+
+.widget-clock .style-digital .time {
+  display: flex;
+  gap: calc(0.25rem * var(--scale));
+  align-items: center;
+  justify-content: center;
+}
+
+.widget-clock .style-digital .date {
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: calc(0.75rem * var(--scale));
+  letter-spacing: 0.1em;
+  color: var(--text-secondary);
+  margin-top: calc(0.75rem * var(--scale));
+  text-transform: uppercase;
+}
+
+/* 7-segment digit container */
+.seg-digit {
+  position: relative;
+  width: calc(28px * var(--scale));
+  height: calc(50px * var(--scale));
+}
+
+.seg-colon {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  height: calc(50px * var(--scale));
+  padding: calc(10px * var(--scale)) calc(4px * var(--scale));
+}
+
+.seg-colon::before,
+.seg-colon::after {
+  content: '';
+  width: calc(6px * var(--scale));
+  height: calc(6px * var(--scale));
+  background: var(--accent);
+  border-radius: 1px;
+}
+
+/* Individual segments */
+.seg-digit .seg {
+  position: absolute;
+  background: var(--accent);
+  transition: opacity 0.05s;
+}
+
+.seg-digit .seg.off {
+  background: var(--bg-secondary);
+}
+
+/* Horizontal segments (a, d, g) */
+.seg-digit .seg-a,
+.seg-digit .seg-d,
+.seg-digit .seg-g {
+  width: calc(20px * var(--scale));
+  height: calc(4px * var(--scale));
+  left: calc(4px * var(--scale));
+  clip-path: polygon(10% 0, 90% 0, 100% 50%, 90% 100%, 10% 100%, 0 50%);
+}
+
+.seg-digit .seg-a { top: 0; }
+.seg-digit .seg-g { top: calc(23px * var(--scale)); }
+.seg-digit .seg-d { bottom: 0; }
+
+/* Vertical segments (b, c, e, f) */
+.seg-digit .seg-b,
+.seg-digit .seg-c,
+.seg-digit .seg-e,
+.seg-digit .seg-f {
+  width: calc(4px * var(--scale));
+  height: calc(20px * var(--scale));
+  clip-path: polygon(50% 0, 100% 10%, 100% 90%, 50% 100%, 0 90%, 0 10%);
+}
+
+.seg-digit .seg-f { top: calc(4px * var(--scale)); left: 0; }
+.seg-digit .seg-b { top: calc(4px * var(--scale)); right: 0; }
+.seg-digit .seg-e { bottom: calc(4px * var(--scale)); left: 0; }
+.seg-digit .seg-c { bottom: calc(4px * var(--scale)); right: 0; }
+
+/* Clock Style: Modern - gradient squares */
+.widget-clock .style-modern {
+  display: flex;
+  gap: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.widget-clock .style-modern.horizontal {
+  flex-direction: row;
+}
+
+.widget-clock .style-modern.vertical {
+  flex-direction: column;
+}
+
+.widget-clock .modern-box {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+}
+
+.widget-clock .modern-box .box-top,
+.widget-clock .modern-box .box-bottom {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.widget-clock .modern-box .value {
+  font-family: 'Fredoka', 'Baloo 2', 'Comic Neue', 'Raleway', sans-serif;
+  font-size: clamp(1rem, 4vw, 3rem);
+  font-weight: 600;
+  color: white;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.25);
+  letter-spacing: 0.02em;
+}
+
+/* Time box - gradient from accent hue -56 to accent */
+.widget-clock .time-box .box-top {
+  background: linear-gradient(135deg, 
+    oklch(from var(--accent) 0.55 c calc(h - 56)), 
+    oklch(from var(--accent) 0.6 c calc(h - 28))
+  );
+}
+
+.widget-clock .time-box .box-bottom {
+  background: linear-gradient(135deg, 
+    oklch(from var(--accent) 0.5 c calc(h - 28)), 
+    oklch(from var(--accent) 0.45 c h)
+  );
+}
+
+/* Date box - gradient from accent to accent hue +56 */
+.widget-clock .date-box .box-top {
+  background: linear-gradient(135deg, 
+    oklch(from var(--accent) 0.55 c h), 
+    oklch(from var(--accent) 0.6 c calc(h + 28))
+  );
+}
+
+.widget-clock .date-box .box-bottom {
+  background: linear-gradient(135deg, 
+    oklch(from var(--accent) 0.5 c calc(h + 28)), 
+    oklch(from var(--accent) 0.45 c calc(h + 56))
+  );
+}
+
+/* Clock Style: Analog - clean analog clock face */
+.widget-clock .style-analog {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+
+.widget-clock .analog-clock {
+  --size: 120px;
+  position: relative;
+  width: var(--size);
+  height: var(--size);
+}
+
+.widget-clock .clock-face {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border: calc(var(--size) * 0.025) solid var(--text-primary);
+  border-radius: 50%;
+  background: var(--bg-widget);
+}
+
+/* Hour markers */
+.widget-clock .hour-marker {
+  position: absolute;
+  top: calc(var(--size) * 0.07);
+  left: 50%;
+  width: calc(var(--size) * 0.015);
+  height: calc(var(--size) * 0.03);
+  margin-left: calc(var(--size) * -0.0075);
+  background: var(--text-secondary);
+  transform-origin: center calc(var(--size) * 0.43);
+}
+
+.widget-clock .hour-marker.major {
+  width: calc(var(--size) * 0.025);
+  height: calc(var(--size) * 0.10);
+  margin-left: calc(var(--size) * -0.0125);
+  transform-origin: center calc(var(--size) * 0.43);
+  background: var(--text-primary);
+}
+
+.widget-clock .hand {
+  position: absolute;
+  bottom: 50%;
+  left: 50%;
+  transform-origin: bottom center;
+  background: var(--text-primary);
+  border-radius: 2px;
+}
+
+.widget-clock .hour-hand {
+  width: calc(var(--size) * 0.035);
+  height: calc(var(--size) * 0.25);
+  margin-left: calc(var(--size) * -0.0175);
+}
+
+.widget-clock .minute-hand {
+  width: calc(var(--size) * 0.02);
+  height: calc(var(--size) * 0.35);
+  margin-left: calc(var(--size) * -0.01);
+}
+
+.widget-clock .center-dot {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: calc(var(--size) * 0.07);
+  height: calc(var(--size) * 0.07);
+  background: var(--accent);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.widget-clock .clock-date {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, calc(var(--size) * 0.08));
+  font-size: calc(var(--size) * 0.09);
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
 }
 
 /* Search Widget */

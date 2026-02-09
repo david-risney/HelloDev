@@ -40,12 +40,11 @@ Your personal developer dashboard is ready to customize.
 
 ## Getting Started
 
-1. **Click the ☰ menu** in the top-right to enter edit mode
-2. **Add widgets** from the panel that appears
-3. **Drag and resize widgets** to arrange your layout
-4. **Configure widgets** by clicking ⚙ on each one
-
-*Delete this widget when you're ready!*`
+- [ ] **Click the ☰ menu** in the top-right to enter edit mode
+- [ ] **Add widgets** from the panel that appears
+- [ ] **Drag and resize widgets** to arrange your layout
+- [ ] **Configure widgets** by clicking ⚙ on each one
+- [ ] *Delete this widget when you're ready!*`
     }
   }
 ];

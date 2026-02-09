@@ -131,7 +131,7 @@ export class MarkdownHelper {
         const checkboxMatch = content.match(/^\[([ xX])\]\s*(.*)$/);
         if (checkboxMatch) {
           const checked = checkboxMatch[1].toLowerCase() === 'x';
-          content = `<input type="checkbox"${checked ? ' checked' : ''}> ` + checkboxMatch[2];
+          content = `<input type="checkbox"${checked ? ' checked' : ''}> ` + this.parseInline(checkboxMatch[2]);
           hasCheckbox = true;
         } else {
           content = this.parseInline(content);
