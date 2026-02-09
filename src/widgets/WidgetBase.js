@@ -1,3 +1,5 @@
+import { GRID_CELL_SIZE, GRID_GAP } from '../constants.js';
+
 /**
  * Base class for all widgets
  * 
@@ -272,33 +274,29 @@ export class WidgetBase {
       const startHeight = this.height;
       
       const onMouseMove = (moveEvent) => {
-        const cellSize = 80; // GRID_CELL_SIZE
-        const gap = 16; // grid gap
         const deltaX = moveEvent.clientX - startX;
         const deltaY = moveEvent.clientY - startY;
-        
+
         // Calculate new size based on drag distance
-        const newWidth = Math.max(1, startWidth + Math.round(deltaX / (cellSize + gap)));
-        const newHeight = Math.max(1, startHeight + Math.round(deltaY / (cellSize + gap)));
-        
+        const newWidth = Math.max(1, startWidth + Math.round(deltaX / (GRID_CELL_SIZE + GRID_GAP)));
+        const newHeight = Math.max(1, startHeight + Math.round(deltaY / (GRID_CELL_SIZE + GRID_GAP)));
+
         // Update visual preview
         el.style.gridColumn = `${this.x + 1} / span ${newWidth}`;
         el.style.gridRow = `${this.y + 1} / span ${newHeight}`;
       };
-      
+
       const onMouseUp = (upEvent) => {
         document.removeEventListener('mousemove', onMouseMove);
         document.removeEventListener('mouseup', onMouseUp);
         el.classList.remove('resizing');
         el.draggable = true; // Re-enable drag
-        
-        const cellSize = 80; // GRID_CELL_SIZE
-        const gap = 16;
+
         const deltaX = upEvent.clientX - startX;
         const deltaY = upEvent.clientY - startY;
-        
-        const newWidth = Math.max(1, startWidth + Math.round(deltaX / (cellSize + gap)));
-        const newHeight = Math.max(1, startHeight + Math.round(deltaY / (cellSize + gap)));
+
+        const newWidth = Math.max(1, startWidth + Math.round(deltaX / (GRID_CELL_SIZE + GRID_GAP)));
+        const newHeight = Math.max(1, startHeight + Math.round(deltaY / (GRID_CELL_SIZE + GRID_GAP)));
         
         if (newWidth !== startWidth || newHeight !== startHeight) {
           resizeWidget(this.id, newWidth, newHeight);
