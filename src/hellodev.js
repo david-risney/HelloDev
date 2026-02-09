@@ -2,7 +2,7 @@
 
 import { createWidget, WidgetRegistry } from './widgets/index.js';
 import { STORAGE_KEY, STORAGE_VERSION, DEFAULT_THEME } from './constants.js';
-import { setupDashboardDragDrop } from './dragDrop.js';
+import { setupWidgetDrag } from './dragDrop.js';
 import { openWidgetConfig as openWidgetConfigDialog, setupWidgetConfigDelegation } from './widgetConfig.js';
 import { loadTheme } from './theme.js';
 import {
@@ -75,7 +75,6 @@ function init() {
   loadWidgets();
   renderDashboard();
   setupEventListeners();
-  setupDashboardDragDrop(dashboard, state, moveWidget);
   setupWidgetConfigDelegation();
 }
 
@@ -234,10 +233,6 @@ function toggleEditMode() {
   dataBtn.classList.toggle('visible', state.editMode);
   aboutBtn.classList.toggle('visible', state.editMode);
 
-  dashboard.querySelectorAll('.widget').forEach(el => {
-    el.draggable = state.editMode;
-  });
-
   if (!state.editMode) {
     closeAllFlyouts();
   }
@@ -262,9 +257,8 @@ function renderDashboard() {
 
   state.widgets.forEach(widget => {
     const el = widget.createElement(removeWidget, resizeWidget, openWidgetConfig);
-    if (state.editMode) {
-      el.draggable = true;
-    }
+    const dragHandle = el.querySelector('.widget-control.drag-handle');
+    setupWidgetDrag(dragHandle, el, widget, dashboard, state, moveWidget);
     dashboard.appendChild(el);
   });
 }

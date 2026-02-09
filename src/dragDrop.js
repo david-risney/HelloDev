@@ -1,13 +1,13 @@
-// Drag-and-drop management for the dashboard grid
+// Drag-and-drop management for the dashboard grid (pointer events for mouse + touch)
 
 import { GRID_CELL_SIZE, GRID_GAP, DASHBOARD_PADDING } from './constants.js';
 
-// Calculate grid position from a mouse/drag event relative to the dashboard
-export function getGridPositionFromEvent(dashboardEl, e) {
+// Calculate grid position from client coordinates relative to the dashboard
+export function getGridPosition(dashboardEl, clientX, clientY) {
   const rect = dashboardEl.getBoundingClientRect();
 
-  const relativeX = e.clientX - rect.left - DASHBOARD_PADDING;
-  const relativeY = e.clientY - rect.top - DASHBOARD_PADDING;
+  const relativeX = clientX - rect.left - DASHBOARD_PADDING;
+  const relativeY = clientY - rect.top - DASHBOARD_PADDING;
 
   const x = Math.max(0, Math.floor(relativeX / (GRID_CELL_SIZE + GRID_GAP)));
   const y = Math.max(0, Math.floor(relativeY / (GRID_CELL_SIZE + GRID_GAP)));
@@ -35,46 +35,36 @@ function removeDropIndicator(dashboardEl) {
   }
 }
 
-// Setup drag-and-drop event listeners on the dashboard element.
-// state: the shared dashboard state object
-// moveWidget: callback(id, x, y) to move a widget to a new position
-export function setupDashboardDragDrop(dashboardEl, state, moveWidget) {
-  dashboardEl.addEventListener('dragover', (e) => {
+// Setup pointer-based drag on a widget's drag handle.
+// dashboardEl: the dashboard grid element
+// state: shared dashboard state (checks editMode)
+// moveWidget: callback(id, x, y) to move a widget
+export function setupWidgetDrag(dragHandle, widgetEl, widget, dashboardEl, state, moveWidget) {
+  dragHandle.addEventListener('pointerdown', (e) => {
     if (!state.editMode) return;
     e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
+    e.stopPropagation();
+    dragHandle.setPointerCapture(e.pointerId);
+    widgetEl.classList.add('dragging');
 
-    // Track which widget is being dragged
-    if (!state.draggingWidget) {
-      const draggingEl = dashboardEl.querySelector('.widget.dragging');
-      if (draggingEl) {
-        state.draggingWidget = state.widgets.find(w => w.id === draggingEl.dataset.id);
-      }
-    }
+    const onPointerMove = (moveEvent) => {
+      const pos = getGridPosition(dashboardEl, moveEvent.clientX, moveEvent.clientY);
+      updateDropIndicator(dashboardEl, pos.x, pos.y, widget.width, widget.height);
+    };
 
-    // Show drop indicator with widget dimensions
-    const pos = getGridPositionFromEvent(dashboardEl, e);
-    const width = state.draggingWidget?.width ?? 1;
-    const height = state.draggingWidget?.height ?? 1;
-    updateDropIndicator(dashboardEl, pos.x, pos.y, width, height);
-  });
-
-  dashboardEl.addEventListener('dragleave', (e) => {
-    // Only remove indicator if leaving the dashboard entirely
-    if (!dashboardEl.contains(e.relatedTarget)) {
+    const onPointerUp = (upEvent) => {
+      dragHandle.removeEventListener('pointermove', onPointerMove);
+      dragHandle.removeEventListener('pointerup', onPointerUp);
+      widgetEl.classList.remove('dragging');
       removeDropIndicator(dashboardEl);
-      state.draggingWidget = null;
-    }
-  });
 
-  dashboardEl.addEventListener('drop', (e) => {
-    if (!state.editMode) return;
-    e.preventDefault();
-    removeDropIndicator(dashboardEl);
-    state.draggingWidget = null;
+      const pos = getGridPosition(dashboardEl, upEvent.clientX, upEvent.clientY);
+      if (pos.x !== widget.x || pos.y !== widget.y) {
+        moveWidget(widget.id, pos.x, pos.y);
+      }
+    };
 
-    const widgetId = e.dataTransfer.getData('text/plain');
-    const pos = getGridPositionFromEvent(dashboardEl, e);
-    moveWidget(widgetId, pos.x, pos.y);
+    dragHandle.addEventListener('pointermove', onPointerMove);
+    dragHandle.addEventListener('pointerup', onPointerUp);
   });
 }

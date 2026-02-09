@@ -220,7 +220,7 @@ export class WidgetBase {
     const el = document.createElement('div');
     el.className = `widget widget-${this.type}`;
     el.dataset.id = this.id;
-    el.draggable = false; // Only enabled in edit mode via class
+    el.draggable = false;
     
     // Set grid position and size using CSS grid placement
     el.style.gridColumn = `${this.x + 1} / span ${this.width}`;
@@ -244,36 +244,20 @@ export class WidgetBase {
       openWidgetConfig(this.id);
     });
 
-    // Setup drag and drop for moving
-    el.addEventListener('dragstart', (e) => {
-      // Don't start drag if resizing
-      if (el.classList.contains('resizing')) {
-        e.preventDefault();
-        return;
-      }
-      el.classList.add('dragging');
-      e.dataTransfer.setData('text/plain', this.id);
-      e.dataTransfer.effectAllowed = 'move';
-    });
-
-    el.addEventListener('dragend', () => {
-      el.classList.remove('dragging');
-    });
-
-    // Setup resize handle drag
+    // Setup resize handle (pointer events for mouse + touch support)
     const resizeHandle = el.querySelector('.widget-control.resize-handle');
-    resizeHandle.addEventListener('mousedown', (e) => {
+    resizeHandle.addEventListener('pointerdown', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      el.draggable = false; // Disable drag while resizing
+      resizeHandle.setPointerCapture(e.pointerId);
       el.classList.add('resizing');
-      
+
       const startX = e.clientX;
       const startY = e.clientY;
       const startWidth = this.width;
       const startHeight = this.height;
-      
-      const onMouseMove = (moveEvent) => {
+
+      const onPointerMove = (moveEvent) => {
         const deltaX = moveEvent.clientX - startX;
         const deltaY = moveEvent.clientY - startY;
 
@@ -286,25 +270,24 @@ export class WidgetBase {
         el.style.gridRow = `${this.y + 1} / span ${newHeight}`;
       };
 
-      const onMouseUp = (upEvent) => {
-        document.removeEventListener('mousemove', onMouseMove);
-        document.removeEventListener('mouseup', onMouseUp);
+      const onPointerUp = (upEvent) => {
+        resizeHandle.removeEventListener('pointermove', onPointerMove);
+        resizeHandle.removeEventListener('pointerup', onPointerUp);
         el.classList.remove('resizing');
-        el.draggable = true; // Re-enable drag
 
         const deltaX = upEvent.clientX - startX;
         const deltaY = upEvent.clientY - startY;
 
         const newWidth = Math.max(1, startWidth + Math.round(deltaX / (GRID_CELL_SIZE + GRID_GAP)));
         const newHeight = Math.max(1, startHeight + Math.round(deltaY / (GRID_CELL_SIZE + GRID_GAP)));
-        
+
         if (newWidth !== startWidth || newHeight !== startHeight) {
           resizeWidget(this.id, newWidth, newHeight);
         }
       };
-      
-      document.addEventListener('mousemove', onMouseMove);
-      document.addEventListener('mouseup', onMouseUp);
+
+      resizeHandle.addEventListener('pointermove', onPointerMove);
+      resizeHandle.addEventListener('pointerup', onPointerUp);
     });
 
     return el;
