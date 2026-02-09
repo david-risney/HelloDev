@@ -604,7 +604,9 @@ export class ADOPRWidget extends WidgetBase {
       this.lastServerFetch = this.lastFetched;
       this.saveToCache();
     } catch (err) {
-      const originalError = `\n\n--- Original Error ---\n${err.message || 'Unknown error'}\n${err.stack || ''}`;
+      const originalError = err.details 
+        ? `\n\n--- Original Error ---\n${err.details}`
+        : `\n\n--- Original Error ---\n${err.message || 'Unknown error'}\n${err.stack || ''}`;
       
       // Check if we're offline
       if (!navigator.onLine) {
@@ -621,7 +623,7 @@ export class ADOPRWidget extends WidgetBase {
       } else {
         this.error = {
           message: err.message || 'Failed to fetch PRs',
-          details: err.stack || null
+          details: err.details || err.stack || null
         };
       }
       this.errorDialogOpen = true;

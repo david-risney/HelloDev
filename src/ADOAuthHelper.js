@@ -204,8 +204,10 @@ class ADOAuthHelper {
           console.error('[ADOAuthHelper] Chrome runtime error:', chrome.runtime.lastError.message);
           reject(new Error('Extension communication error. Try reloading the page.'));
         } else if (response?.error) {
-          console.error('[ADOAuthHelper] Background returned error:', response.error);
-          reject(new Error(response.error));
+          console.error('[ADOAuthHelper] Background returned error:', response.error, response.details || '');
+          const err = new Error(response.error);
+          err.details = response.details || null;
+          reject(err);
         } else if (!response) {
           console.error('[ADOAuthHelper] No response from background');
           reject(new Error('No response from background script'));
