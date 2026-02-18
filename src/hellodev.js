@@ -1,7 +1,7 @@
 // HelloDev Dashboard - Main orchestrator
 
 import { createWidget, WidgetRegistry } from './widgets/index.js';
-import { STORAGE_KEY, STORAGE_VERSION, DEFAULT_THEME } from './constants.js';
+import { STORAGE_KEY, STORAGE_VERSION, DEFAULT_THEME, GRID_CELL_SIZE, GRID_GAP } from './constants.js';
 import { setupWidgetDrag } from './dragDrop.js';
 import { openWidgetConfig as openWidgetConfigDialog, setupWidgetConfigDelegation } from './widgetConfig.js';
 import { loadTheme } from './theme.js';
@@ -261,6 +261,9 @@ function renderDashboard() {
     setupWidgetDrag(dragHandle, el, widget, dashboard, state, moveWidget);
     dashboard.appendChild(el);
   });
+
+  // Recalculate stretch-fill widgets now that elements are in the DOM
+  updateStretchFillWidgets();
 }
 
 // ============================================================================
@@ -338,8 +341,23 @@ function resizeWidget(id, newWidth, newHeight) {
   }
 }
 
+// Recalculate grid placement for all stretch-fill widgets
+function updateStretchFillWidgets() {
+  for (const widget of state.widgets) {
+    if (widget.stretchFill && widget.element) {
+      widget.applyGridPosition();
+    }
+  }
+}
+
+// Watch for dashboard size changes to update stretch-fill widgets
+const dashboardResizeObserver = new ResizeObserver(() => {
+  updateStretchFillWidgets();
+});
+dashboardResizeObserver.observe(dashboard);
+
 function openWidgetConfig(id) {
   const widget = state.widgets.find(w => w.id === id);
   if (!widget) return;
-  openWidgetConfigDialog(widget, { removeWidget, saveWidgets, renderDashboard });
+  openWidgetConfigDialog(widget, { removeWidget, saveWidgets, renderDashboard, widgets: state.widgets, openWidgetConfig });
 }

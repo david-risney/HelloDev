@@ -154,12 +154,6 @@ export class GerritCLWidget extends WidgetBase {
     this.updateContent();
 
     try {
-      // Build auth header based on selected mode
-      if (this.data.authMode === 'oauth') {
-        this.loadingStatus = 'Obtaining access token...';
-        this.updateContent();
-      }
-
       const authHeader = await GerritAuthHelper.getAuthHeader(
         this.data.authMode,
         { token: this.data.gitcookieToken }

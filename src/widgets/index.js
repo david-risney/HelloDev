@@ -7,6 +7,7 @@ export { ADOPRWidget } from './ADOPRWidget.js';
 export { ADOBugsWidget } from './ADOBugsWidget.js';
 export { FrameWidget } from './FrameWidget.js';
 export { GerritCLWidget } from './GerritCLWidget.js';
+export { FluidWidget } from './FluidWidget.js';
 
 import { WidgetBase } from './WidgetBase.js';
 import { ClockWidget } from './ClockWidget.js';
@@ -16,6 +17,7 @@ import { ADOPRWidget } from './ADOPRWidget.js';
 import { ADOBugsWidget } from './ADOBugsWidget.js';
 import { FrameWidget } from './FrameWidget.js';
 import { GerritCLWidget } from './GerritCLWidget.js';
+import { FluidWidget } from './FluidWidget.js';
 
 // Widget factory - creates the appropriate widget class instance
 export const WidgetRegistry = {
@@ -25,7 +27,8 @@ export const WidgetRegistry = {
   adopr: ADOPRWidget,
   adobugs: ADOBugsWidget,
   frame: FrameWidget,
-  gerritcl: GerritCLWidget
+  gerritcl: GerritCLWidget,
+  fluid: FluidWidget
 };
 
 export function createWidget(config) {

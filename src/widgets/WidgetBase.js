@@ -97,9 +97,10 @@ export class WidgetBase {
     this.type = config.type;
     this.x = config.x ?? 0;
     this.y = config.y ?? 0;
-    this.zIndex = config.zIndex ?? 0;
     this.width = config.width ?? 1;
     this.height = config.height ?? 1;
+    this.zIndex = config.zIndex ?? 0;
+    this.stretchFill = config.stretchFill ?? false;
     this.data = config.data || {};
     this.element = null;
   }
@@ -171,6 +172,34 @@ export class WidgetBase {
   }
 
   /**
+   * Apply grid position and size to the widget element.
+   * When stretchFill is enabled, calculates remaining columns/rows from the
+   * dashboard grid so the widget stretches to fill the available space.
+   */
+  applyGridPosition() {
+    const el = this.element;
+    if (!el) return;
+
+    if (this.stretchFill) {
+      const dashboard = el.closest('.dashboard') || el.parentElement;
+      if (dashboard) {
+        const cols = getComputedStyle(dashboard).gridTemplateColumns.split(' ').length;
+        const dashboardRect = dashboard.getBoundingClientRect();
+        const rows = Math.max(1, Math.floor((dashboardRect.height + GRID_GAP) / (GRID_CELL_SIZE + GRID_GAP)));
+        el.style.gridColumn = `${this.x + 1} / ${cols + 1}`;
+        el.style.gridRow = `${this.y + 1} / ${rows + 1}`;
+      } else {
+        // Fallback before DOM insertion
+        el.style.gridColumn = `${this.x + 1} / -1`;
+        el.style.gridRow = `${this.y + 1} / -1`;
+      }
+    } else {
+      el.style.gridColumn = `${this.x + 1} / span ${this.width}`;
+      el.style.gridRow = `${this.y + 1} / span ${this.height}`;
+    }
+  }
+
+  /**
    * Get the widget content HTML
    * @returns {string} HTML content for the widget
    */
@@ -204,9 +233,10 @@ export class WidgetBase {
       type: this.type,
       x: this.x,
       y: this.y,
-      zIndex: this.zIndex,
       width: this.width,
       height: this.height,
+      zIndex: this.zIndex,
+      stretchFill: this.stretchFill,
       data: this.data
     };
   }
@@ -224,12 +254,13 @@ export class WidgetBase {
     el.dataset.id = this.id;
     el.draggable = false;
     
+    this.element = el;
+
     // Set grid position, size, and stacking order using CSS grid placement
-    el.style.gridColumn = `${this.x + 1} / span ${this.width}`;
-    el.style.gridRow = `${this.y + 1} / span ${this.height}`;
     if (this.zIndex) {
       el.style.zIndex = this.zIndex;
     }
+    this.applyGridPosition();
 
     el.innerHTML = `
       <button class="widget-control drag-handle" title="Drag to move">✥</button>
@@ -240,7 +271,6 @@ export class WidgetBase {
       </div>
     `;
 
-    this.element = el;
     this.setupBehavior(el);
 
     // Setup control buttons

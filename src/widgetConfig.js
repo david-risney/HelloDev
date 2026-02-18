@@ -102,12 +102,13 @@ function renderWidgetConfigFields(widget) {
 
 // Collect form values and save them back to the widget
 function saveWidgetConfig(widget, dialog, { saveWidgets, closeWidgetConfig, renderDashboard }) {
-  // Save position, size, and z-index
+  // Save position, size, z-index, and stretch fill
   widget.x = parseInt(dialog.querySelector('input[name="x"]').value) || 0;
   widget.y = parseInt(dialog.querySelector('input[name="y"]').value) || 0;
   widget.zIndex = parseInt(dialog.querySelector('input[name="zIndex"]').value) || 0;
   widget.width = Math.max(1, parseInt(dialog.querySelector('input[name="width"]').value) || 1);
   widget.height = Math.max(1, parseInt(dialog.querySelector('input[name="height"]').value) || 1);
+  widget.stretchFill = dialog.querySelector('input[name="stretchFill"]')?.checked || false;
 
   // Collect widget-specific config values
   const schema = widget.getConfigSchema();
@@ -169,6 +170,10 @@ export function openWidgetConfig(widget, callbacks) {
   dialog.innerHTML = safeHtml`
     <div class="widget-config-dialog">
       <div class="widget-config-header">
+        <div class="widget-config-nav">
+          <button class="widget-config-nav-btn" data-dir="prev" title="Previous widget">&lt;</button>
+          <button class="widget-config-nav-btn" data-dir="next" title="Next widget">&gt;</button>
+        </div>
         <h3>Configure Widget</h3>
         <button class="widget-config-close" title="Close">\u2715</button>
       </div>
@@ -185,16 +190,20 @@ export function openWidgetConfig(widget, callbacks) {
               <input type="number" name="y" value="${widget.y}" min="0">
             </label>
             <label>
-              <span>Z-Index</span>
-              <input type="number" name="zIndex" value="${widget.zIndex}">
-            </label>
-            <label>
               <span>Width</span>
               <input type="number" name="width" value="${widget.width}" min="1">
             </label>
             <label>
               <span>Height</span>
               <input type="number" name="height" value="${widget.height}" min="1">
+            </label>
+            <label>
+              <span>Z-Index</span>
+              <input type="number" name="zIndex" value="${widget.zIndex}">
+            </label>
+            <label class="checkbox-label">
+              <input type="checkbox" name="stretchFill" ${rawHtml(widget.stretchFill ? 'checked' : '')}>
+              <span>Stretch Fill</span>
             </label>
           </div>
         </div>
@@ -233,6 +242,30 @@ export function openWidgetConfig(widget, callbacks) {
       saveWidgets: callbacks.saveWidgets,
       closeWidgetConfig,
       renderDashboard: callbacks.renderDashboard
+    });
+  });
+
+  // Prev/Next navigation buttons
+  dialog.querySelectorAll('.widget-config-nav-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const widgets = callbacks.widgets || [];
+      const currentIndex = widgets.findIndex(w => w.id === widget.id);
+      if (currentIndex === -1) return;
+
+      const dir = btn.dataset.dir;
+      const nextIndex = dir === 'prev'
+        ? (currentIndex - 1 + widgets.length) % widgets.length
+        : (currentIndex + 1) % widgets.length;
+
+      // Save current widget before navigating
+      saveWidgetConfig(widget, dialog, {
+        saveWidgets: callbacks.saveWidgets,
+        closeWidgetConfig,
+        renderDashboard: callbacks.renderDashboard
+      });
+
+      // Open the next/prev widget's config
+      callbacks.openWidgetConfig(widgets[nextIndex].id);
     });
   });
 }
