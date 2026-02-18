@@ -39,7 +39,7 @@ export class GerritCLWidget extends WidgetBase {
     this.data.authMode ??= 'anonymous';
     this.data.gitcookieToken ??= '';
     this.data.maxCount ??= 25;
-    this.data.refreshInterval ??= 5;
+    this.data.refreshInterval ??= 60;
     this.data.title ??= '';
     this.data.maxAgeDays ??= 0;
 
@@ -79,27 +79,18 @@ export class GerritCLWidget extends WidgetBase {
         type: 'string', default: ''
       },
       { key: 'maxCount', label: 'Max Results', type: 'number', default: 25 },
-      { key: 'refreshInterval', label: 'Auto-Refresh (minutes, 0 = off)', type: 'number', default: 5 },
+      { key: 'refreshInterval', label: 'Auto-Refresh (minutes, 0 = off)', type: 'number', default: 60 },
       { key: 'maxAgeDays', label: 'Max Age (days, 0 = no limit)', type: 'number', default: 0 }
     ];
   }
 
   setConfig(values) {
-    const refreshNeeded =
-      values.gerritHost !== this.data.gerritHost ||
-      values.query !== this.data.query ||
-      values.authMode !== this.data.authMode ||
-      values.maxCount !== this.data.maxCount;
-
     super.setConfig(values);
-
-    if (refreshNeeded) {
-      this.clearCache();
-      this.items = [];
-      this.lastFetched = null;
-      this.error = null;
-      if (this.element) this.refresh();
-    }
+    this.clearCache();
+    this.items = [];
+    this.lastFetched = null;
+    this.error = null;
+    if (this.element) this.refresh();
   }
 
   // ---------------------------------------------------------------------------
@@ -276,6 +267,9 @@ export class GerritCLWidget extends WidgetBase {
     const lastFetchedStr = this.lastFetched
       ? TimeFormatter.formatRelative(this.lastFetched)
       : '';
+    const lastFetchedTooltip = this.lastFetched
+      ? `Last updated ${TimeFormatter.formatAbsoluteShort(this.lastFetched)}`
+      : 'Last updated';
 
     const displayTitle = this.escapeHtml(this.data.title || 'Gerrit CLs');
     const titleUrl = this.getTitleUrl();
@@ -334,7 +328,7 @@ export class GerritCLWidget extends WidgetBase {
     return `
       <div class="ado-widget-header">
         ${titleHtml}
-        <span class="ado-widget-last-updated" title="Last updated">${lastFetchedStr}</span>
+        <span class="ado-widget-last-updated" title="${lastFetchedTooltip}">${lastFetchedStr}</span>
         ${statusHtml}
         <button class="ado-widget-refresh" title="Reload">⟳</button>
       </div>
@@ -482,6 +476,7 @@ export class GerritCLWidget extends WidgetBase {
   startAutoRefresh() {
     if (this.intervalId) clearInterval(this.intervalId);
     this.intervalId = setInterval(() => {
+      this.updateContent();
       if (!this.isConfigured) return;
       if (!this.data.refreshInterval || this.data.refreshInterval <= 0) return;
       const intervalMs = this.data.refreshInterval * 60 * 1000;

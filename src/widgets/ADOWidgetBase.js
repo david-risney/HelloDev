@@ -234,6 +234,9 @@ export class ADOWidgetBase extends WidgetBase {
     const lastFetchedStr = this.lastFetched
       ? TimeFormatter.formatRelative(this.lastFetched)
       : '';
+    const lastFetchedTooltip = this.lastFetched
+      ? `Last updated ${TimeFormatter.formatAbsoluteShort(this.lastFetched)}`
+      : 'Last updated';
 
     const displayTitle = this.escapeHtml(this.data.title || this.getDefaultTitle());
     const titleUrl = this.getTitleUrl();
@@ -291,7 +294,7 @@ export class ADOWidgetBase extends WidgetBase {
     return `
       <div class="ado-widget-header">
         ${titleHtml}
-        <span class="ado-widget-last-updated" title="Last updated">${lastFetchedStr}</span>
+        <span class="ado-widget-last-updated" title="${lastFetchedTooltip}">${lastFetchedStr}</span>
         ${statusHtml}
         <button class="ado-widget-refresh" title="Reload">⟳</button>
       </div>
@@ -364,6 +367,7 @@ export class ADOWidgetBase extends WidgetBase {
   startAutoRefresh() {
     if (this.intervalId) clearInterval(this.intervalId);
     this.intervalId = setInterval(() => {
+      this.updateContent();
       if (!this.isConfigured) return;
       if (!this.data.refreshInterval || this.data.refreshInterval <= 0) return;
       const intervalMs = this.data.refreshInterval * 60 * 1000;

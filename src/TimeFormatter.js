@@ -70,4 +70,29 @@ export class TimeFormatter {
     if (minutes > 0) return `${minutes}m`;
     return 'now';
   }
+
+  /**
+   * Format a date/timestamp as a short absolute string (e.g., "12-25-2026 3:42pm").
+   * @param {Date|number|string} date - Date object, timestamp in ms, or date string
+   * @returns {string} Formatted date string, or empty string if invalid
+   */
+  static formatAbsoluteShort(date) {
+    if (!date) return '';
+
+    const d = date instanceof Date ? date :
+              typeof date === 'number' ? new Date(date) :
+              new Date(date);
+
+    if (isNaN(d.getTime())) return '';
+
+    const month = d.getMonth() + 1;
+    const day = String(d.getDate()).padStart(2, '0');
+    const year = d.getFullYear();
+    let hours = d.getHours();
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    const ampm = hours >= 12 ? 'pm' : 'am';
+    hours = hours % 12 || 12;
+
+    return `${month}-${day}-${year} ${hours}:${minutes}${ampm}`;
+  }
 }

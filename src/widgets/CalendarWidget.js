@@ -277,6 +277,9 @@ export class CalendarWidget extends WidgetBase {
     const lastFetchedStr = this.lastFetched
       ? TimeFormatter.formatRelative(this.lastFetched)
       : '';
+    const lastFetchedTooltip = this.lastFetched
+      ? `Last updated ${TimeFormatter.formatAbsoluteShort(this.lastFetched)}`
+      : 'Last updated';
 
     const displayTitle = this.escapeHtml(this.data.title || 'Today\'s Agenda');
 
@@ -328,7 +331,7 @@ export class CalendarWidget extends WidgetBase {
     return `
       <div class="ado-widget-header">
         <span class="ado-widget-title">${displayTitle}</span>
-        <span class="ado-widget-last-updated" title="Last updated">${lastFetchedStr}</span>
+        <span class="ado-widget-last-updated" title="${lastFetchedTooltip}">${lastFetchedStr}</span>
         ${statusHtml}
         <button class="ado-widget-refresh" title="Reload">⟳</button>
       </div>
@@ -393,6 +396,7 @@ export class CalendarWidget extends WidgetBase {
   startAutoRefresh() {
     if (this.intervalId) clearInterval(this.intervalId);
     this.intervalId = setInterval(() => {
+      this.updateContent();
       if (!this.data.refreshInterval || this.data.refreshInterval <= 0) return;
       const intervalMs = this.data.refreshInterval * 60 * 1000;
       if (!this.lastFetched || (Date.now() - this.lastFetched) >= intervalMs) {
