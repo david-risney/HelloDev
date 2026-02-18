@@ -526,6 +526,7 @@ body {
 
 /* Dashboard Grid */
 .dashboard {
+  position: relative;
   display: grid;
   grid-template-columns: repeat(auto-fill, var(--grid-cell-size));
   grid-auto-rows: var(--grid-cell-size);
@@ -569,10 +570,29 @@ body {
   outline-color: var(--accent);
 }
 
+/* Stretch-fill: widget fills the entire dashboard area */
+.widget-stretch-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  outline: none;
+}
+
+.widget-stretch-fill .widget-control.drag-handle,
+.widget-stretch-fill .widget-control.resize-handle {
+  display: none;
+}
+
 /* Widget Controls (edit mode) */
 .widget-control {
   display: flex;
   position: absolute;
+  z-index: 1;
   width: 28px;
   height: 28px;
   align-items: center;
@@ -642,14 +662,6 @@ body {
 }
 
 /* Widget dragging state */
-.edit-mode .widget {
-  cursor: grab;
-}
-
-.edit-mode .widget:active {
-  cursor: grabbing;
-}
-
 .widget.dragging {
   opacity: 0.5;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
@@ -669,6 +681,7 @@ body {
   border-radius: var(--border-radius);
   border: 2px dashed var(--accent);
   pointer-events: none;
+  z-index: 100;
 }
 
 /* Clock Widget */
@@ -2345,7 +2358,6 @@ body.light-mode .calendar-event-current {
   position: absolute;
   border-radius: 50%;
   filter: blur(50px);
-  will-change: transform;
 }
 
 /* Blob 1 - large, cyan end */
@@ -2355,7 +2367,6 @@ body.light-mode .calendar-event-current {
   top: -30%;
   left: -30%;
   background: radial-gradient(circle, oklch(from var(--accent) l c calc(h - 56) / 0.7) 0%, transparent 60%);
-  animation: fluid-drift-1 25s ease-in-out infinite;
 }
 
 /* Blob 2 - magenta/pink end */
@@ -2365,7 +2376,6 @@ body.light-mode .calendar-event-current {
   bottom: -30%;
   right: -30%;
   background: radial-gradient(circle, oklch(from var(--accent) l c calc(h + 56) / 0.7) 0%, transparent 60%);
-  animation: fluid-drift-2 30s ease-in-out infinite;
 }
 
 /* Blob 3 - accent center hue */
@@ -2375,7 +2385,6 @@ body.light-mode .calendar-event-current {
   top: -15%;
   right: -20%;
   background: radial-gradient(circle, oklch(from var(--accent) l c h / 0.6) 0%, transparent 55%);
-  animation: fluid-drift-3 35s ease-in-out infinite;
 }
 
 /* Blob 4 - blue-cyan shift */
@@ -2385,7 +2394,6 @@ body.light-mode .calendar-event-current {
   bottom: -20%;
   left: -15%;
   background: radial-gradient(circle, oklch(from var(--accent) l c calc(h - 30) / 0.55) 0%, transparent 55%);
-  animation: fluid-drift-4 28s ease-in-out infinite;
 }
 
 /* Blob 5 - pink-magenta shift */
@@ -2395,40 +2403,6 @@ body.light-mode .calendar-event-current {
   top: 10%;
   left: 15%;
   background: radial-gradient(circle, oklch(from var(--accent) l c calc(h + 30) / 0.5) 0%, transparent 55%);
-  animation: fluid-drift-5 32s ease-in-out infinite;
-}
-
-@keyframes fluid-drift-1 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  25%      { transform: translate(8%, 12%) scale(1.05); }
-  50%      { transform: translate(-5%, 8%) scale(0.95); }
-  75%      { transform: translate(10%, -6%) scale(1.02); }
-}
-
-@keyframes fluid-drift-2 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  25%      { transform: translate(-12%, -8%) scale(1.03); }
-  50%      { transform: translate(10%, -12%) scale(0.97); }
-  75%      { transform: translate(-6%, 10%) scale(1.05); }
-}
-
-@keyframes fluid-drift-3 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  33%      { transform: translate(-10%, 15%) scale(1.06); }
-  66%      { transform: translate(12%, -8%) scale(0.94); }
-}
-
-@keyframes fluid-drift-4 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  25%      { transform: translate(15%, -10%) scale(0.96); }
-  50%      { transform: translate(-8%, -15%) scale(1.04); }
-  75%      { transform: translate(6%, 12%) scale(1.01); }
-}
-
-@keyframes fluid-drift-5 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  33%      { transform: translate(-14%, 6%) scale(1.05); }
-  66%      { transform: translate(8%, -14%) scale(0.96); }
 }
 
 /* Storage error toast */

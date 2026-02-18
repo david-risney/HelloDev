@@ -179,6 +179,19 @@ export function openWidgetConfig(widget, callbacks) {
       </div>
       <div class="widget-config-content">
         <div class="widget-config-section">
+          <h4>Widget Info</h4>
+          <div class="widget-config-grid">
+            <label>
+              <span>Type</span>
+              <input type="text" value="${widget.constructor.metadata?.name || widget.type}" readonly>
+            </label>
+            <label>
+              <span>ID</span>
+              <input type="text" value="${widget.id}" readonly>
+            </label>
+          </div>
+        </div>
+        <div class="widget-config-section">
           <h4>Position & Size</h4>
           <div class="widget-config-grid">
             <label>

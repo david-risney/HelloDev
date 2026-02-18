@@ -1,7 +1,7 @@
 // HelloDev Dashboard - Main orchestrator
 
 import { createWidget, WidgetRegistry } from './widgets/index.js';
-import { STORAGE_KEY, STORAGE_VERSION, DEFAULT_THEME, GRID_CELL_SIZE, GRID_GAP } from './constants.js';
+import { STORAGE_KEY, STORAGE_VERSION, DEFAULT_THEME, GRID_CELL_SIZE, GRID_GAP, DASHBOARD_PADDING } from './constants.js';
 import { setupWidgetDrag } from './dragDrop.js';
 import { openWidgetConfig as openWidgetConfigDialog, setupWidgetConfigDelegation } from './widgetConfig.js';
 import { loadTheme } from './theme.js';
@@ -280,18 +280,41 @@ function moveWidget(id, newX, newY) {
   }
 }
 
-function findNextPosition() {
-  let maxY = -1;
-  state.widgets.forEach(w => {
-    const bottomY = w.y + w.height;
-    if (bottomY > maxY) maxY = bottomY;
-  });
-  return { x: 0, y: maxY < 0 ? 0 : maxY };
+function findNextPosition(newWidth, newHeight, newZIndex) {
+  // Only consider widgets at the same or higher z-index
+  const relevant = state.widgets.filter(w => !w.stretchFill && w.zIndex >= newZIndex);
+
+  // Determine how many grid columns fit in the current dashboard width
+  const dashWidth = dashboard.clientWidth - DASHBOARD_PADDING * 2;
+  const maxCols = Math.max(1, Math.floor((dashWidth + GRID_GAP) / (GRID_CELL_SIZE + GRID_GAP)));
+
+  if (relevant.length === 0) return { x: 0, y: 0 };
+
+  // Scan rows top-to-bottom; find the first row where the new widget fits
+  const maxRow = Math.max(...relevant.map(w => w.y + w.height));
+
+  for (let row = 0; row <= maxRow; row++) {
+    let rightEdge = 0;
+    for (const w of relevant) {
+      // Widget occupies rows w.y .. w.y+w.height-1
+      if (w.y < row + newHeight && w.y + w.height > row) {
+        const right = w.x + w.width;
+        if (right > rightEdge) rightEdge = right;
+      }
+    }
+    // Check if the new widget fits in this row
+    if (rightEdge + newWidth <= maxCols) {
+      return { x: rightEdge, y: row };
+    }
+  }
+
+  // No row has space — place below everything
+  return { x: 0, y: maxRow };
 }
 
 function addWidget(type) {
   const id = `widget-${Date.now()}`;
-  const pos = findNextPosition();
+  const WidgetClass = WidgetRegistry[type];
 
   const existingWidgetsOfType = state.widgets.filter(w => w.type === type);
   const existingWidget = existingWidgetsOfType.length > 0
@@ -304,12 +327,14 @@ function addWidget(type) {
     height = existingWidget.height;
     data = structuredClone(existingWidget.data);
   } else {
-    const WidgetClass = WidgetRegistry[type];
     const defaultSize = WidgetClass?.metadata?.defaultSize || { width: 2, height: 2 };
     width = defaultSize.width;
     height = defaultSize.height;
     data = {};
   }
+
+  const newZIndex = WidgetClass?.metadata?.defaultZIndex ?? 2;
+  const pos = findNextPosition(width, height, newZIndex);
 
   const config = { id, type, x: pos.x, y: pos.y, width, height, data };
   const newWidget = createWidget(config);

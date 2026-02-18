@@ -99,7 +99,7 @@ export class WidgetBase {
     this.y = config.y ?? 0;
     this.width = config.width ?? 1;
     this.height = config.height ?? 1;
-    this.zIndex = config.zIndex ?? 0;
+    this.zIndex = config.zIndex ?? this.constructor.metadata?.defaultZIndex ?? 2;
     this.stretchFill = config.stretchFill ?? false;
     this.data = config.data || {};
     this.element = null;
@@ -181,19 +181,10 @@ export class WidgetBase {
     if (!el) return;
 
     if (this.stretchFill) {
-      const dashboard = el.closest('.dashboard') || el.parentElement;
-      if (dashboard) {
-        const cols = getComputedStyle(dashboard).gridTemplateColumns.split(' ').length;
-        const dashboardRect = dashboard.getBoundingClientRect();
-        const rows = Math.max(1, Math.floor((dashboardRect.height + GRID_GAP) / (GRID_CELL_SIZE + GRID_GAP)));
-        el.style.gridColumn = `${this.x + 1} / ${cols + 1}`;
-        el.style.gridRow = `${this.y + 1} / ${rows + 1}`;
-      } else {
-        // Fallback before DOM insertion
-        el.style.gridColumn = `${this.x + 1} / -1`;
-        el.style.gridRow = `${this.y + 1} / -1`;
-      }
+      el.classList.add('widget-stretch-fill');
+      // Grid placement is ignored when stretch-fill is active (uses absolute positioning)
     } else {
+      el.classList.remove('widget-stretch-fill');
       el.style.gridColumn = `${this.x + 1} / span ${this.width}`;
       el.style.gridRow = `${this.y + 1} / span ${this.height}`;
     }
@@ -257,9 +248,7 @@ export class WidgetBase {
     this.element = el;
 
     // Set grid position, size, and stacking order using CSS grid placement
-    if (this.zIndex) {
-      el.style.zIndex = this.zIndex;
-    }
+    el.style.zIndex = this.zIndex;
     this.applyGridPosition();
 
     el.innerHTML = `
