@@ -6,9 +6,8 @@ import { TimeFormatter } from '../TimeFormatter.js';
  * Gerrit CL Review Widget
  *
  * Displays a list of Chromium (or any Gerrit instance) code-review CLs.
- * Supports three auth modes:
- *   - oauth      : Google OAuth2 via chrome.identity (requires GCP Client ID)
- *   - gitcookies : HTTP Basic auth with credentials from ~/.gitcookies
+ * Supports two auth modes:
+ *   - gitcookies : HTTP Basic auth with token from chromium.googlesource.com/new-password
  *   - anonymous  : No auth – only public data visible
  *
  * Gerrit REST API returns JSON prefixed with )]}\' which must be stripped.
@@ -38,8 +37,7 @@ export class GerritCLWidget extends WidgetBase {
     this.data.gerritHost ??= 'https://chromium-review.googlesource.com';
     this.data.query ??= 'status:open';
     this.data.authMode ??= 'anonymous';
-    this.data.gitcookiesUser ??= '';
-    this.data.gitcookiesPass ??= '';
+    this.data.gitcookieToken ??= '';
     this.data.maxCount ??= 25;
     this.data.refreshInterval ??= 5;
     this.data.title ??= '';
@@ -72,13 +70,14 @@ export class GerritCLWidget extends WidgetBase {
         key: 'authMode', label: 'Authentication', type: 'select',
         options: [
           { value: 'anonymous', label: 'Anonymous (public CLs only)' },
-          { value: 'oauth', label: 'Google OAuth2' },
-          { value: 'gitcookies', label: 'Git Cookies (Basic auth)' }
+          { value: 'gitcookies', label: 'Git Cookies' }
         ],
         default: 'anonymous'
       },
-      { key: 'gitcookiesUser', label: 'Git Cookies Username (if Basic auth)', type: 'string', default: '' },
-      { key: 'gitcookiesPass', label: 'Git Cookies Password (if Basic auth)', type: 'string', default: '' },
+      {
+        key: 'gitcookieToken', label: 'Git Cookie Token (from chromium.googlesource.com/new-password)',
+        type: 'string', default: ''
+      },
       { key: 'maxCount', label: 'Max Results', type: 'number', default: 25 },
       { key: 'refreshInterval', label: 'Auto-Refresh (minutes, 0 = off)', type: 'number', default: 5 },
       { key: 'maxAgeDays', label: 'Max Age (days, 0 = no limit)', type: 'number', default: 0 }
@@ -163,7 +162,7 @@ export class GerritCLWidget extends WidgetBase {
 
       const authHeader = await GerritAuthHelper.getAuthHeader(
         this.data.authMode,
-        { username: this.data.gitcookiesUser, password: this.data.gitcookiesPass }
+        { token: this.data.gitcookieToken }
       );
 
       this.loadingStatus = 'Querying Gerrit...';
@@ -367,7 +366,7 @@ export class GerritCLWidget extends WidgetBase {
     const initials = this.getInitials(cl.owner?.name || cl.owner?.email || '?');
     const age = TimeFormatter.formatRelative(cl.updated || cl.created);
     const host = this.data.gerritHost.replace(/\/+$/, '');
-    const url = `${host}/c/${encodeURIComponent(cl.project || '')}/${number}`;
+    const url = `${host}/c/${cl.project || ''}/+/${number}`;
 
     // Code-Review label
     const crLabel = this.getCodeReviewLabel(cl);
