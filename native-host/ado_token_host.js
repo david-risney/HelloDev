@@ -22,25 +22,30 @@ const ADO_RESOURCE = '499b84ac-1321-427f-aa17-267ca6975798';
 function findAzCli() {
   const isWindows = process.platform === 'win32';
   
-  // First, try the command directly (works if PATH is set correctly)
-  const azCmd = isWindows ? 'az.cmd' : 'az';
-  try {
-    execSync(`${azCmd} --version`, { 
-      encoding: 'utf8', 
-      timeout: 5000,
-      stdio: ['pipe', 'pipe', 'pipe']
-    });
-    return azCmd;
-  } catch (e) {
-    // Continue to check common paths
+  // First, try the commands directly (works if PATH is set correctly)
+  const azCmds = isWindows ? ['az', 'az.bat', 'az.cmd'] : ['az'];
+  for (const azCmd of azCmds) {
+    try {
+      execSync(`${azCmd} --version`, {
+        encoding: 'utf8',
+        timeout: 5000,
+        stdio: ['pipe', 'pipe', 'pipe']
+      });
+      return azCmd;
+    } catch (e) {
+      // Continue to next candidate
+    }
   }
 
   // Common installation paths
   const possiblePaths = isWindows ? [
     // Default Azure CLI installation
+    'C:\\Program Files (x86)\\Microsoft SDKs\\Azure\\CLI2\\wbin\\az.bat',
+    'C:\\Program Files\\Microsoft SDKs\\Azure\\CLI2\\wbin\\az.bat',
     'C:\\Program Files (x86)\\Microsoft SDKs\\Azure\\CLI2\\wbin\\az.cmd',
     'C:\\Program Files\\Microsoft SDKs\\Azure\\CLI2\\wbin\\az.cmd',
     // Winget/scoop installations
+    path.join(os.homedir(), 'AppData\\Local\\Programs\\Azure CLI\\wbin\\az.bat'),
     path.join(os.homedir(), 'AppData\\Local\\Programs\\Azure CLI\\wbin\\az.cmd'),
     path.join(os.homedir(), 'scoop\\shims\\az.cmd'),
     // Python pip installation
@@ -60,7 +65,17 @@ function findAzCli() {
 
   for (const azPath of possiblePaths) {
     if (fs.existsSync(azPath)) {
-      return azPath;
+      try {
+        execSync(`"${azPath}" --version`, {
+          encoding: 'utf8',
+          timeout: 5000,
+          stdio: ['pipe', 'pipe', 'pipe'],
+          shell: true
+        });
+        return azPath;
+      } catch (e) {
+        // This az.cmd exists but doesn't work (e.g. broken Python reference), skip it
+      }
     }
   }
 
@@ -125,14 +140,17 @@ function writeMessage(message) {
 }
 
 /**
- * Get Azure DevOps access token using az cli
+ * Get an access token for the given resource using az cli
+ * @param {string} [resource] - The resource to get a token for (defaults to ADO_RESOURCE)
  */
-function getAzureDevOpsToken() {
+function getAccessToken(resource) {
+  const targetResource = resource || ADO_RESOURCE;
+
   try {
     // Find the az CLI executable
     const azPath = findAzCli();
     if (!azPath) {
-      const installUrl = process.platform === 'win32' 
+      const installUrl = process.platform === 'win32'
         ? 'https://aka.ms/installazurecliwindows'
         : 'https://aka.ms/InstallAzureCLIDeb';
       return { error: `Azure CLI (az) not found. Install from ${installUrl}` };
@@ -140,8 +158,8 @@ function getAzureDevOpsToken() {
 
     // Check if logged in by trying to get account info
     try {
-      execSync(`"${azPath}" account show`, { 
-        encoding: 'utf8', 
+      execSync(`${azPath} account show`, {
+        encoding: 'utf8',
         timeout: 10000,
         stdio: ['pipe', 'pipe', 'pipe'],
         shell: true
@@ -149,9 +167,9 @@ function getAzureDevOpsToken() {
     } catch (e) {
       const stderr = e.stderr?.toString() || '';
       const stdout = e.stdout?.toString() || '';
-      return { 
+      return {
         error: 'Not logged in to Azure CLI. Open a terminal and run: az login',
-        details: [stderr, stdout, e.message].filter(Boolean).join('\n')
+        details: [`az path: ${azPath}`, stderr, stdout, e.message].filter(Boolean).join('\n')
       };
     }
 
@@ -159,8 +177,8 @@ function getAzureDevOpsToken() {
     let result;
     try {
       result = execSync(
-        `"${azPath}" account get-access-token --resource ${ADO_RESOURCE} -o json`,
-        { 
+        `${azPath} account get-access-token --resource ${targetResource} -o json`,
+        {
           encoding: 'utf8',
           timeout: 30000,
           stdio: ['pipe', 'pipe', 'pipe'],
@@ -170,9 +188,9 @@ function getAzureDevOpsToken() {
     } catch (e) {
       const stderr = e.stderr?.toString() || '';
       const stdout = e.stdout?.toString() || '';
-      return { 
+      return {
         error: 'Failed to get access token',
-        details: [stderr, stdout, e.message].filter(Boolean).join('\n')
+        details: [`az path: ${azPath}`, stderr, stdout, e.message].filter(Boolean).join('\n')
       };
     }
     
@@ -194,21 +212,21 @@ function getAzureDevOpsToken() {
     const stdout = error.stdout?.toString() || '';
     
     if (msg.includes('ETIMEDOUT') || msg.includes('timeout')) {
-      return { 
+      return {
         error: 'Azure CLI timed out. Open a terminal and run: az login',
-        details: [stderr, stdout, msg].filter(Boolean).join('\n')
+        details: [`az path: ${azPath}`, stderr, stdout, msg].filter(Boolean).join('\n')
       };
     }
     if (msg.includes('AADSTS')) {
-      return { 
+      return {
         error: 'Azure token expired. Open a terminal and run: az login',
-        details: [stderr, stdout, msg].filter(Boolean).join('\n')
+        details: [`az path: ${azPath}`, stderr, stdout, msg].filter(Boolean).join('\n')
       };
     }
-    
-    return { 
+
+    return {
       error: `Failed to get token: ${msg}`,
-      details: [stderr, stdout, msg].filter(Boolean).join('\n')
+      details: [`az path: ${azPath}`, stderr, stdout, msg].filter(Boolean).join('\n')
     };
   }
 }
@@ -221,7 +239,7 @@ async function main() {
     const message = await readMessage();
     
     if (message.action === 'getToken') {
-      const result = getAzureDevOpsToken();
+      const result = getAccessToken(message.resource);
       writeMessage(result);
     } else {
       writeMessage({ error: `Unknown action: ${message.action}` });

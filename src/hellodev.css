@@ -1968,6 +1968,125 @@ body.light-mode .ado-widget-item:hover {
   color: var(--text-secondary);
 }
 
+/* ==========================================================================
+   Calendar Widget
+   ========================================================================== */
+
+.widget-calendar .widget-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.calendar-event-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.calendar-event {
+  border-radius: 6px;
+  border-left: 3px solid var(--accent);
+  transition: background 0.2s ease;
+}
+
+.calendar-event:nth-child(odd) {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.calendar-event:nth-child(even) {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.calendar-event:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+body.light-mode .calendar-event:nth-child(odd) {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+body.light-mode .calendar-event:nth-child(even) {
+  background: rgba(0, 0, 0, 0.07);
+}
+
+body.light-mode .calendar-event:hover {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.calendar-event.calendar-tentative {
+  border-left-color: #f39c12;
+}
+
+.calendar-event.calendar-oof {
+  border-left-color: #9b59b6;
+}
+
+.calendar-event.calendar-free {
+  border-left-color: #2ecc71;
+}
+
+.calendar-event.calendar-busy {
+  border-left-color: #3498db;
+}
+
+.calendar-event-current {
+  background: rgba(52, 152, 219, 0.12) !important;
+}
+
+body.light-mode .calendar-event-current {
+  background: rgba(52, 152, 219, 0.1) !important;
+}
+
+.calendar-event-link {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.5rem 0.625rem;
+  text-decoration: none;
+  color: inherit;
+}
+
+.calendar-event-time {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+  min-width: 6.5em;
+  padding-top: 0.1rem;
+}
+
+.calendar-event-allday .calendar-event-time {
+  font-style: italic;
+}
+
+.calendar-event-details {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.calendar-event-subject {
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.calendar-event-location {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Frame Widget */
 .widget-frame {
   padding: 0;

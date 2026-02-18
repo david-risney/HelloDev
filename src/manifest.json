@@ -4,7 +4,11 @@
   "version": "1.0.0",
   "description": "A simple custom new tab page extension",
   "permissions": [
-    "nativeMessaging"
+    "nativeMessaging",
+    "identity"
+  ],
+  "host_permissions": [
+    "https://login.microsoftonline.com/*"
   ],
   "action": {
     "default_title": "HelloDev",

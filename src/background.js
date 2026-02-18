@@ -15,8 +15,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   
   if (request.type === 'ADO_GET_TOKEN') {
     console.log('[background] Getting token from native host...');
-    getAzureDevOpsToken().then(result => {
-      console.log('[background] Native host result:', 
+    getAccessToken(request.resource).then(result => {
+      console.log('[background] Native host result:',
         result.error ? `error: ${result.error} ${result.details || ''}` : 'success');
       sendResponse(result);
     });
@@ -30,13 +30,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 });
 
-// Get Azure DevOps access token via native messaging host
-async function getAzureDevOpsToken() {
+// Get access token via native messaging host
+async function getAccessToken(resource) {
   return new Promise((resolve) => {
     try {
       console.log('[background] Connecting to native host:', NATIVE_HOST_NAME);
       const port = chrome.runtime.connectNative(NATIVE_HOST_NAME);
-      
+
       port.onMessage.addListener((response) => {
         console.log('[background] Native host response received');
         port.disconnect();
@@ -51,19 +51,21 @@ async function getAzureDevOpsToken() {
           resolve({ error: 'Invalid response from native host' });
         }
       });
-      
+
       port.onDisconnect.addListener(() => {
         const error = chrome.runtime.lastError;
         if (error) {
           console.error('[background] Native host disconnected with error:', error.message);
-          resolve({ 
-            error: `Native host error: ${error.message}. Make sure the native host is installed.` 
+          resolve({
+            error: `Native host error: ${error.message}. Make sure the native host is installed.`
           });
         }
       });
-      
+
       console.log('[background] Sending getToken request to native host');
-      port.postMessage({ action: 'getToken' });
+      const message = { action: 'getToken' };
+      if (resource) message.resource = resource;
+      port.postMessage(message);
     } catch (error) {
       console.error('[background] Exception connecting to native host:', error);
       resolve({ error: error.message });
