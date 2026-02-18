@@ -302,6 +302,7 @@ export class CalendarWidget extends WidgetBase {
             ${errorDetails}
           </div>
           <div class="ado-widget-error-dialog-actions">
+            <button class="ado-widget-error-copy" title="Copy error to clipboard">Copy</button>
             <button class="ado-widget-retry">Retry</button>
           </div>
         </div>
@@ -367,6 +368,17 @@ export class CalendarWidget extends WidgetBase {
         e.stopPropagation();
         this.errorDialogOpen = false;
         this.updateContent();
+      }
+      if (e.target.classList.contains('ado-widget-error-copy')) {
+        e.preventDefault();
+        e.stopPropagation();
+        const msg = this.error?.message || this.error || '';
+        const details = this.error?.details || '';
+        const text = details ? `${msg}\n\n${details}` : msg;
+        navigator.clipboard.writeText(text).then(() => {
+          e.target.textContent = 'Copied!';
+          setTimeout(() => { e.target.textContent = 'Copy'; }, 1500);
+        });
       }
     });
 

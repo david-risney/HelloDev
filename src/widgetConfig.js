@@ -102,9 +102,10 @@ function renderWidgetConfigFields(widget) {
 
 // Collect form values and save them back to the widget
 function saveWidgetConfig(widget, dialog, { saveWidgets, closeWidgetConfig, renderDashboard }) {
-  // Save position and size
+  // Save position, size, and z-index
   widget.x = parseInt(dialog.querySelector('input[name="x"]').value) || 0;
   widget.y = parseInt(dialog.querySelector('input[name="y"]').value) || 0;
+  widget.zIndex = parseInt(dialog.querySelector('input[name="zIndex"]').value) || 0;
   widget.width = Math.max(1, parseInt(dialog.querySelector('input[name="width"]').value) || 1);
   widget.height = Math.max(1, parseInt(dialog.querySelector('input[name="height"]').value) || 1);
 
@@ -182,6 +183,10 @@ export function openWidgetConfig(widget, callbacks) {
             <label>
               <span>Y Position</span>
               <input type="number" name="y" value="${widget.y}" min="0">
+            </label>
+            <label>
+              <span>Z-Index</span>
+              <input type="number" name="zIndex" value="${widget.zIndex}">
             </label>
             <label>
               <span>Width</span>

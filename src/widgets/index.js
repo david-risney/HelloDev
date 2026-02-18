@@ -6,6 +6,7 @@ export { MarkdownWidget } from './MarkdownWidget.js';
 export { ADOPRWidget } from './ADOPRWidget.js';
 export { ADOBugsWidget } from './ADOBugsWidget.js';
 export { FrameWidget } from './FrameWidget.js';
+export { GerritCLWidget } from './GerritCLWidget.js';
 
 import { WidgetBase } from './WidgetBase.js';
 import { ClockWidget } from './ClockWidget.js';
@@ -14,6 +15,7 @@ import { MarkdownWidget } from './MarkdownWidget.js';
 import { ADOPRWidget } from './ADOPRWidget.js';
 import { ADOBugsWidget } from './ADOBugsWidget.js';
 import { FrameWidget } from './FrameWidget.js';
+import { GerritCLWidget } from './GerritCLWidget.js';
 
 // Widget factory - creates the appropriate widget class instance
 export const WidgetRegistry = {
@@ -22,7 +24,8 @@ export const WidgetRegistry = {
   markdown: MarkdownWidget,
   adopr: ADOPRWidget,
   adobugs: ADOBugsWidget,
-  frame: FrameWidget
+  frame: FrameWidget,
+  gerritcl: GerritCLWidget
 };
 
 export function createWidget(config) {

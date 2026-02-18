@@ -97,6 +97,7 @@ export class WidgetBase {
     this.type = config.type;
     this.x = config.x ?? 0;
     this.y = config.y ?? 0;
+    this.zIndex = config.zIndex ?? 0;
     this.width = config.width ?? 1;
     this.height = config.height ?? 1;
     this.data = config.data || {};
@@ -203,6 +204,7 @@ export class WidgetBase {
       type: this.type,
       x: this.x,
       y: this.y,
+      zIndex: this.zIndex,
       width: this.width,
       height: this.height,
       data: this.data
@@ -222,9 +224,12 @@ export class WidgetBase {
     el.dataset.id = this.id;
     el.draggable = false;
     
-    // Set grid position and size using CSS grid placement
+    // Set grid position, size, and stacking order using CSS grid placement
     el.style.gridColumn = `${this.x + 1} / span ${this.width}`;
     el.style.gridRow = `${this.y + 1} / span ${this.height}`;
+    if (this.zIndex) {
+      el.style.zIndex = this.zIndex;
+    }
 
     el.innerHTML = `
       <button class="widget-control drag-handle" title="Drag to move">✥</button>

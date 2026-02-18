@@ -8,7 +8,10 @@
     "identity"
   ],
   "host_permissions": [
-    "https://login.microsoftonline.com/*"
+    "https://login.microsoftonline.com/*",
+    "https://accounts.google.com/*",
+    "https://oauth2.googleapis.com/*",
+    "https://*.googlesource.com/*"
   ],
   "action": {
     "default_title": "HelloDev",
