@@ -1,27 +1,26 @@
 import { WidgetBase } from './WidgetBase.js';
-import { GerritAuthHelper } from '../GerritAuthHelper.js';
+import { IssueTrackerAuthHelper } from '../IssueTrackerAuthHelper.js';
 import { TimeFormatter } from '../TimeFormatter.js';
 
 /**
- * Gerrit CL Review Widget
+ * Chromium Bug / Issue Tracker Widget
  *
- * Displays a list of Chromium (or any Gerrit instance) code-review CLs.
+ * Displays issues from issues.chromium.org (Google Issue Tracker / Buganizer).
+ * Uses the private REST API at https://issuetracker.googleapis.com/v1/.
+ *
  * Supports two auth modes:
- *   - gitcookies : HTTP Basic auth with token from chromium.googlesource.com/new-password
- *   - anonymous  : No auth – only public data visible
- *
- * Gerrit REST API returns JSON prefixed with )]}\' which must be stripped.
- * Authenticated requests use the /a/ prefix on all endpoints.
+ *   - oauth : Google OAuth2 via chrome.identity.launchWebAuthFlow
+ *   - token : Manual Bearer token (e.g. from browser DevTools)
  */
-export class GerritCLWidget extends WidgetBase {
+export class ChromiumBugsWidget extends WidgetBase {
   static metadata = {
-    name: 'Gerrit CLs',
-    icon: '🔍',
+    name: 'Chromium Bugs',
+    icon: '🐞',
     defaultSize: { width: 4, height: 4 }
   };
 
   constructor(config) {
-    super({ ...config, type: 'gerritcl' });
+    super({ ...config, type: 'chromiumbug' });
 
     // State
     this.items = [];
@@ -34,10 +33,9 @@ export class GerritCLWidget extends WidgetBase {
     this.intervalId = null;
 
     // Defaults
-    this.data.gerritHost ??= 'https://chromium-review.googlesource.com';
     this.data.query ??= 'status:open';
-    this.data.authMode ??= 'anonymous';
-    this.data.gitcookieToken ??= '';
+    this.data.authMode ??= 'oauth';
+    this.data.manualToken ??= '';
     this.data.maxCount ??= 25;
     this.data.refreshInterval ??= 60;
     this.data.title ??= '';
@@ -52,30 +50,24 @@ export class GerritCLWidget extends WidgetBase {
   // ---------------------------------------------------------------------------
 
   get isConfigured() {
-    return !!(this.data.gerritHost && this.data.query);
+    return !!this.data.query;
   }
 
   getConfigSchema() {
     return [
       { key: 'title', label: 'Widget Title (optional)', type: 'string', default: '' },
-      {
-        key: 'gerritHost', label: 'Gerrit Host URL', type: 'string',
-        default: 'https://chromium-review.googlesource.com'
-      },
-      {
-        key: 'query', label: 'Search Query', type: 'string',
-        default: 'status:open'
-      },
+      { key: 'query', label: 'Issue Tracker Query', type: 'string', default: 'status:open' },
       {
         key: 'authMode', label: 'Authentication', type: 'select',
         options: [
-          { value: 'anonymous', label: 'Anonymous (public CLs only)' },
-          { value: 'gitcookies', label: 'Git Cookies' }
+          { value: 'oauth', label: 'Google OAuth' },
+          { value: 'token', label: 'Manual Token' }
         ],
-        default: 'anonymous'
+        default: 'oauth'
       },
       {
-        key: 'gitcookieToken', label: 'Git Cookie Token (from chromium.googlesource.com/new-password)',
+        key: 'manualToken',
+        label: 'Access Token (DevTools → Network → any issuetracker.googleapis.com request → Authorization header → copy value after "Bearer ")',
         type: 'string', default: ''
       },
       { key: 'maxCount', label: 'Max Results', type: 'number', default: 25 },
@@ -98,7 +90,7 @@ export class GerritCLWidget extends WidgetBase {
   // ---------------------------------------------------------------------------
 
   getCacheKey() {
-    return `gerritcl_cache_${this.id}`;
+    return `chromiumbug_cache_${this.id}`;
   }
 
   restoreFromCache() {
@@ -109,7 +101,7 @@ export class GerritCLWidget extends WidgetBase {
       this.items = cached.items || [];
       this.lastFetched = cached.lastFetched || null;
     } catch (e) {
-      console.error('[GerritCLWidget] Cache restore error:', e);
+      console.error('[ChromiumBugsWidget] Cache restore error:', e);
     }
   }
 
@@ -120,7 +112,7 @@ export class GerritCLWidget extends WidgetBase {
         lastFetched: this.lastFetched
       }));
     } catch (e) {
-      console.error('[GerritCLWidget] Cache save error:', e);
+      console.error('[ChromiumBugsWidget] Cache save error:', e);
     }
   }
 
@@ -128,7 +120,7 @@ export class GerritCLWidget extends WidgetBase {
     try {
       localStorage.removeItem(this.getCacheKey());
     } catch (e) {
-      console.error('[GerritCLWidget] Cache clear error:', e);
+      console.error('[ChromiumBugsWidget] Cache clear error:', e);
     }
   }
 
@@ -140,21 +132,20 @@ export class GerritCLWidget extends WidgetBase {
     if (this.loading || !this.isConfigured) return;
 
     this.loading = true;
-    this.loadingStatus = 'Fetching CLs...';
+    this.loadingStatus = 'Obtaining access token...';
     this.error = null;
     this.updateContent();
 
     try {
-      const authHeader = await GerritAuthHelper.getAuthHeader(
+      const token = await IssueTrackerAuthHelper.getToken(
         this.data.authMode,
-        { token: this.data.gitcookieToken }
+        { manualToken: this.data.manualToken }
       );
 
-      this.loadingStatus = 'Querying Gerrit...';
+      this.loadingStatus = 'Querying Issue Tracker...';
       this.updateContent();
 
-      this.items = await this.fetchChanges(authHeader);
-      await this.resolveAvatars(authHeader);
+      this.items = await this.fetchIssues(token);
       this.lastFetched = Date.now();
       this.lastServerFetch = this.lastFetched;
       this.saveToCache();
@@ -171,16 +162,16 @@ export class GerritCLWidget extends WidgetBase {
       } else if (err.name === 'TypeError' && err.message.includes('fetch')) {
         this.error = {
           message: 'Network error',
-          details: 'Could not connect to Gerrit. This may be a DNS issue, firewall, or the service may be temporarily unavailable.' + originalError
+          details: 'Could not connect to Issue Tracker. This may be a DNS issue, firewall, or the service may be temporarily unavailable.' + originalError
         };
       } else {
         this.error = {
-          message: err.message || 'Failed to fetch CLs',
+          message: err.message || 'Failed to fetch issues',
           details: err.details || err.stack || null
         };
       }
       this.errorDialogOpen = true;
-      GerritAuthHelper.handleAuthError(this.error.message);
+      IssueTrackerAuthHelper.handleAuthError(this.error.message);
     } finally {
       this.loading = false;
       this.loadingStatus = '';
@@ -189,96 +180,52 @@ export class GerritCLWidget extends WidgetBase {
   }
 
   // ---------------------------------------------------------------------------
-  // Gerrit REST API
+  // Issue Tracker REST API
   // ---------------------------------------------------------------------------
 
-  async fetchChanges(authHeader) {
-    const host = this.data.gerritHost.replace(/\/+$/, '');
-    const prefix = authHeader ? '/a' : '';
+  async fetchIssues(token) {
     const params = new URLSearchParams({
-      q: this.data.query,
-      n: String(this.data.maxCount || 25),
-      o: 'DETAILED_LABELS',
-      // Additional option params — Gerrit allows repeated 'o' keys
+      query: this.data.query,
+      pageSize: String(this.data.maxCount || 25),
+      orderBy: 'modified_time desc'
     });
-    // Gerrit supports repeated query params; URLSearchParams.append works
-    params.append('o', 'DETAILED_ACCOUNTS');
-    params.append('o', 'CURRENT_REVISION');
-    params.append('o', 'CURRENT_COMMIT');
-    params.append('o', 'MESSAGES');
 
-    const url = `${host}${prefix}/changes/?${params}`;
+    const url = `https://issuetracker.googleapis.com/v1/issues?${params}`;
 
-    const headers = {};
-    if (authHeader) {
-      headers['Authorization'] = authHeader;
-    }
-
-    const response = await fetch(url, { headers });
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
 
     if (!response.ok) {
       if (response.status === 401 || response.status === 403) {
         throw new Error(`Authentication failed (${response.status}). Check your auth settings.`);
       }
-      throw new Error(`Gerrit API error: ${response.status} ${response.statusText}`);
+      const errorBody = await response.text().catch(() => '');
+      throw new Error(`Issue Tracker API error: ${response.status} ${response.statusText}${errorBody ? '\n' + errorBody : ''}`);
     }
 
-    const text = await response.text();
-    return this.parseGerritResponse(text);
+    const data = await response.json();
+    return (data.issues || []).map(issue => this.transformIssue(issue));
   }
 
-  /**
-   * Strip Gerrit's XSSI guard prefix )]}' and parse JSON.
-   */
-  parseGerritResponse(text) {
-    const cleaned = text.replace(/^\)\]\}'\n?/, '');
-    try {
-      return JSON.parse(cleaned);
-    } catch (e) {
-      throw new Error('Failed to parse Gerrit response as JSON.');
-    }
-  }
-
-  async resolveAvatars(authHeader) {
-    const host = this.data.gerritHost.replace(/\/+$/, '');
-    const prefix = authHeader ? '/a' : '';
-    const seen = new Map(); // _account_id -> [owner objects]
-
-    for (const cl of this.items) {
-      const owner = cl.owner;
-      if (!owner?._account_id) continue;
-      if (owner.avatarDataUrl) continue; // already resolved (e.g. from cache)
-      const id = owner._account_id;
-      if (!seen.has(id)) seen.set(id, []);
-      seen.get(id).push(owner);
-    }
-
-    await Promise.all([...seen.entries()].map(async ([accountId, owners]) => {
-      const avatarUrl = `${host}${prefix}/accounts/${accountId}/avatar?s=32`;
-      const dataUrl = await this.fetchAvatarAsDataUrl(avatarUrl, authHeader);
-      if (dataUrl) {
-        for (const o of owners) o.avatarDataUrl = dataUrl;
-      }
-    }));
-  }
-
-  async fetchAvatarAsDataUrl(imageUrl, authHeader) {
-    try {
-      const headers = {};
-      if (authHeader) headers['Authorization'] = authHeader;
-      const resp = await fetch(imageUrl, { headers });
-      if (!resp.ok) return null;
-      const blob = await resp.blob();
-      if (!blob.type.startsWith('image/')) return null;
-      return new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result);
-        reader.onerror = () => resolve(null);
-        reader.readAsDataURL(blob);
-      });
-    } catch {
-      return null;
-    }
+  transformIssue(issue) {
+    const state = issue.issueState || {};
+    return {
+      id: issue.issueId,
+      title: state.title || '(no title)',
+      status: state.status || '',
+      priority: state.priority || '',
+      severity: state.severity || '',
+      componentId: state.componentId || '',
+      assignee: state.assignee?.emailAddress || '',
+      reporter: state.reporter?.emailAddress || '',
+      type: state.type || '',
+      createdTime: issue.createdTime || null,
+      modifiedTime: issue.modifiedTime || null,
+      url: `https://issues.chromium.org/issues/${issue.issueId}`
+    };
   }
 
   // ---------------------------------------------------------------------------
@@ -290,8 +237,8 @@ export class GerritCLWidget extends WidgetBase {
       return this.items;
     }
     const cutoffTime = Date.now() - this.data.maxAgeDays * 24 * 60 * 60 * 1000;
-    return this.items.filter(cl => {
-      const dateStr = cl.updated || cl.created;
+    return this.items.filter(item => {
+      const dateStr = item.modifiedTime || item.createdTime;
       if (!dateStr) return true;
       return new Date(dateStr).getTime() >= cutoffTime;
     });
@@ -302,7 +249,7 @@ export class GerritCLWidget extends WidgetBase {
       return `
         <div class="ado-widget-empty">
           <div class="ado-widget-icon">🔧</div>
-          <p>Configure a Gerrit host and query to see CLs</p>
+          <p>Configure a query to see Chromium bugs</p>
         </div>
       `;
     }
@@ -314,7 +261,7 @@ export class GerritCLWidget extends WidgetBase {
       ? `Last updated ${TimeFormatter.formatAbsoluteShort(this.lastFetched)}`
       : 'Last updated';
 
-    const displayTitle = this.escapeHtml(this.data.title || 'Gerrit CLs');
+    const displayTitle = this.escapeHtml(this.data.title || 'Chromium Bugs');
     const titleUrl = this.getTitleUrl();
     const titleHtml = titleUrl
       ? `<a href="${titleUrl}" target="_blank" class="ado-widget-title-link">${displayTitle}</a>`
@@ -357,13 +304,13 @@ export class GerritCLWidget extends WidgetBase {
       listContent = `
         <div class="ado-widget-empty">
           <div class="ado-widget-icon">✓</div>
-          <p>No CLs found</p>
+          <p>No issues found</p>
         </div>
       `;
     } else {
       listContent = `
         <ul class="ado-widget-list">
-          ${filteredItems.map(cl => this.renderItem(cl)).join('')}
+          ${filteredItems.map(item => this.renderItem(item)).join('')}
         </ul>
       `;
     }
@@ -381,58 +328,46 @@ export class GerritCLWidget extends WidgetBase {
   }
 
   getTitleUrl() {
-    if (!this.data.gerritHost || !this.data.query) return null;
-    const host = this.data.gerritHost.replace(/\/+$/, '');
-    return `${host}/q/${encodeURIComponent(this.data.query)}`;
+    if (!this.data.query) return null;
+    return `https://issues.chromium.org/issues?q=${encodeURIComponent(this.data.query)}`;
   }
 
   // ---------------------------------------------------------------------------
-  // Render a single CL item
+  // Render a single issue item
   // ---------------------------------------------------------------------------
 
-  renderItem(cl) {
-    const number = cl._number;
-    const subject = this.escapeHtml(cl.subject || '(no subject)');
-    const owner = this.escapeHtml(cl.owner?.name || cl.owner?.email || 'Unknown');
-    const initials = this.getInitials(cl.owner?.name || cl.owner?.email || '?');
-    const avatarDataUrl = cl.owner?.avatarDataUrl;
-    const age = TimeFormatter.formatRelative(cl.updated || cl.created);
-    const host = this.data.gerritHost.replace(/\/+$/, '');
-    const url = `${host}/c/${cl.project || ''}/+/${number}`;
+  renderItem(item) {
+    const title = this.escapeHtml(item.title);
+    const age = TimeFormatter.formatRelative(item.modifiedTime || item.createdTime);
+    const assignee = this.escapeHtml(item.assignee || 'Unassigned');
+    const initials = this.getInitials(item.assignee || '?');
 
-    // Code-Review label
-    const crLabel = this.getCodeReviewLabel(cl);
-
-    // Insertions / Deletions
-    const statsHtml = this.getStatsHtml(cl);
-
-    // Unresolved comments count
-    const unresolvedCount = cl.unresolved_comment_count || 0;
-    const commentsHtml = unresolvedCount > 0
-      ? `<span class="gerrit-cl-comments" title="${unresolvedCount} unresolved comment${unresolvedCount !== 1 ? 's' : ''}">💬${unresolvedCount}</span>`
+    // Priority badge
+    const priorityHtml = item.priority
+      ? `<span class="chromiumbug-priority ${this.getPriorityClass(item.priority)}">${this.escapeHtml(item.priority)}</span>`
       : '';
 
-    const avatarHtml = avatarDataUrl
-      ? `<img class="ado-widget-avatar" src="${avatarDataUrl}" alt="${owner}"><span class="ado-widget-avatar-initials" style="display:none">${initials}</span>`
-      : `<span class="ado-widget-avatar-initials">${initials}</span>`;
+    // Status badge
+    const statusHtml = item.status
+      ? `<span class="chromiumbug-status ${this.getStatusClass(item.status)}">${this.escapeHtml(item.status)}</span>`
+      : '';
 
     return `
       <li class="ado-widget-item">
-        <a href="${url}" target="_blank" class="ado-widget-link">
+        <a href="${item.url}" target="_blank" class="ado-widget-link">
           <div class="ado-widget-avatar-container">
-            ${avatarHtml}
+            <span class="ado-widget-avatar-initials">${initials}</span>
           </div>
-          <div class="gerrit-cl-content">
-            <div class="gerrit-cl-line1">
-              <span class="gerrit-cl-subject">${subject}</span>
-              ${crLabel}
+          <div class="chromiumbug-content">
+            <div class="chromiumbug-line1">
+              <span class="chromiumbug-item-title">${title}</span>
+              ${priorityHtml}
             </div>
-            <div class="gerrit-cl-line2">
-              <span class="gerrit-cl-number">${number}</span>
-              <span class="gerrit-cl-owner">${owner}</span>
-              ${statsHtml}
-              ${commentsHtml}
-              <span class="gerrit-cl-age">${age}</span>
+            <div class="chromiumbug-line2">
+              <span class="chromiumbug-item-id">${item.id}</span>
+              ${statusHtml}
+              <span class="chromiumbug-item-assigned">${assignee}</span>
+              <span class="chromiumbug-item-age">${age}</span>
             </div>
           </div>
         </a>
@@ -440,30 +375,24 @@ export class GerritCLWidget extends WidgetBase {
     `;
   }
 
-  /**
-   * Return an HTML badge for the Code-Review label.
-   */
-  getCodeReviewLabel(cl) {
-    const labels = cl.labels?.['Code-Review'];
-    if (!labels) return '';
-
-    // Check for approvals/rejections
-    if (labels.rejected) return '<span class="gerrit-cl-label gerrit-cl-label-minus2" title="Code-Review -2">CR-2</span>';
-    if (labels.disliked) return '<span class="gerrit-cl-label gerrit-cl-label-minus1" title="Code-Review -1">CR-1</span>';
-    if (labels.approved) return '<span class="gerrit-cl-label gerrit-cl-label-plus2" title="Code-Review +2">CR+2</span>';
-    if (labels.recommended) return '<span class="gerrit-cl-label gerrit-cl-label-plus1" title="Code-Review +1">CR+1</span>';
-
-    return '<span class="gerrit-cl-label gerrit-cl-label-none" title="Code-Review 0">CR</span>';
+  getPriorityClass(priority) {
+    if (!priority) return '';
+    const p = priority.toUpperCase();
+    if (p === 'P0') return 'priority-p0';
+    if (p === 'P1') return 'priority-p1';
+    if (p === 'P2') return 'priority-p2';
+    if (p === 'P3') return 'priority-p3';
+    if (p === 'P4') return 'priority-p4';
+    return '';
   }
 
-  getStatsHtml(cl) {
-    const ins = cl.insertions ?? 0;
-    const del = cl.deletions ?? 0;
-    if (ins === 0 && del === 0) return '';
-    const parts = [];
-    if (ins > 0) parts.push(`<span class="gerrit-cl-stat-ins">+${ins}</span>`);
-    if (del > 0) parts.push(`<span class="gerrit-cl-stat-del">-${del}</span>`);
-    return `<span class="gerrit-cl-stats">${parts.join('')}</span>`;
+  getStatusClass(status) {
+    if (!status) return '';
+    const s = status.toUpperCase();
+    if (s === 'NEW' || s === 'ASSIGNED' || s === 'ACCEPTED') return 'status-active';
+    if (s === 'FIXED' || s === 'VERIFIED') return 'status-resolved';
+    if (s === 'NOT_REPRODUCIBLE' || s === 'INTENDED_BEHAVIOR' || s === 'OBSOLETE' || s === 'INFEASIBLE' || s === 'DUPLICATE') return 'status-closed';
+    return '';
   }
 
   // ---------------------------------------------------------------------------
@@ -475,12 +404,6 @@ export class GerritCLWidget extends WidgetBase {
     const contentEl = this.element.querySelector('.widget-content');
     if (!contentEl) return;
     contentEl.innerHTML = this.getContent();
-    contentEl.querySelectorAll('.ado-widget-avatar').forEach(img => {
-      img.addEventListener('error', () => {
-        img.style.display = 'none';
-        img.nextElementSibling.style.display = 'flex';
-      });
-    });
   }
 
   setupBehavior(element) {
@@ -559,7 +482,9 @@ export class GerritCLWidget extends WidgetBase {
 
   getInitials(name) {
     if (!name) return '?';
-    const parts = name.trim().split(/\s+/);
+    // For email addresses, use the part before @
+    const displayName = name.includes('@') ? name.split('@')[0] : name;
+    const parts = displayName.trim().split(/[\s._-]+/);
     if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
     return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
   }

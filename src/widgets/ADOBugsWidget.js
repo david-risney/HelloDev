@@ -145,7 +145,7 @@ export class ADOBugsWidget extends ADOWidgetBase {
 
     const batchData = await batchResponse.json();
 
-    return (batchData.value || []).map(wi => ({
+    const items = (batchData.value || []).map(wi => ({
       id: wi.id,
       title: wi.fields['System.Title'],
       state: wi.fields['System.State'],
@@ -156,6 +156,10 @@ export class ADOBugsWidget extends ADOWidgetBase {
       severity: wi.fields['Microsoft.VSTS.Common.Severity'],
       url: `https://dev.azure.com/${this.data.organization}/${this.data.project}/_workitems/edit/${wi.id}`
     }));
+
+    await this.resolveIdentityAvatars(items.map(i => i.assignedTo).filter(Boolean), accessToken);
+
+    return items;
   }
 
   buildWiql() {

@@ -11,7 +11,8 @@
     "https://login.microsoftonline.com/*",
     "https://accounts.google.com/*",
     "https://oauth2.googleapis.com/*",
-    "https://*.googlesource.com/*"
+    "https://*.googlesource.com/*",
+    "https://issuetracker.googleapis.com/*"
   ],
   "action": {
     "default_title": "HelloDev",

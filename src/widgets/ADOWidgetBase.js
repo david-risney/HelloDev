@@ -394,6 +394,41 @@ export class ADOWidgetBase extends WidgetBase {
     return div.innerHTML;
   }
 
+  async fetchAvatarAsDataUrl(imageUrl, accessToken) {
+    try {
+      const resp = await fetch(imageUrl, {
+        headers: { 'Authorization': `Bearer ${accessToken}` }
+      });
+      if (!resp.ok) return null;
+      const blob = await resp.blob();
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(blob);
+      });
+    } catch {
+      return null;
+    }
+  }
+
+  async resolveIdentityAvatars(identities, accessToken) {
+    const urlMap = new Map();
+    for (const id of identities) {
+      if (!id?.imageUrl || id.imageUrl.startsWith('data:')) continue;
+      if (!urlMap.has(id.imageUrl)) urlMap.set(id.imageUrl, []);
+      urlMap.get(id.imageUrl).push(id);
+    }
+    await Promise.all([...urlMap.entries()].map(async ([url, ids]) => {
+      const dataUrl = await this.fetchAvatarAsDataUrl(url, accessToken);
+      if (dataUrl) {
+        for (const id of ids) id.imageUrl = dataUrl;
+      } else {
+        for (const id of ids) id.imageUrl = null;
+      }
+    }));
+  }
+
   getInitials(name) {
     if (!name) return '?';
     const parts = name.trim().split(/\s+/);

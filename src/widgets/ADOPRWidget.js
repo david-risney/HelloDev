@@ -100,10 +100,14 @@ export class ADOPRWidget extends ADOWidgetBase {
 
     const data = await response.json();
 
-    return (data.value || []).map(pr => ({
+    const items = (data.value || []).map(pr => ({
       ...pr,
       url: `https://dev.azure.com/${this.data.organization}/${this.data.project}/_git/${pr.repository?.name || ''}/pullrequest/${pr.pullRequestId}`
     }));
+
+    await this.resolveIdentityAvatars(items.map(i => i.createdBy).filter(Boolean), accessToken);
+
+    return items;
   }
 
   buildApiUrl(creatorId, reviewerId) {
