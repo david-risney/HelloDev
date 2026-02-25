@@ -100,28 +100,6 @@ body {
   border-color: var(--accent);
 }
 
-/* Legacy support */
-.edit-toggle {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 1rem;
-  background: var(--bg-widget);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  color: var(--text-primary);
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.edit-toggle:hover {
-  background: var(--accent);
-}
-
-.edit-toggle.active {
-  background: var(--accent);
-  border-color: var(--accent);
-}
 
 /* Edit mode buttons (shown when in edit mode) */
 .edit-mode-btn {
@@ -352,11 +330,6 @@ body {
   border-color: var(--accent);
 }
 
-.toggle-btn.active {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: white;
-}
 
 /* About dialog styles */
 .about-dialog {
@@ -386,12 +359,6 @@ body {
   color: var(--text-secondary);
 }
 
-.about-description {
-  text-align: center;
-  color: var(--text-secondary);
-  font-size: 0.9375rem;
-  margin-bottom: 1rem;
-}
 
 .about-links {
   display: flex;
@@ -635,15 +602,6 @@ body {
   cursor: grabbing;
 }
 
-/* Delete button - upper right */
-.widget-control.delete {
-  top: 0.5rem;
-  right: 0.5rem;
-}
-
-.widget-control.delete:hover {
-  background: var(--danger);
-}
 
 /* Configure button - upper right */
 .widget-control.config {
@@ -1019,29 +977,6 @@ body {
   color: var(--text-secondary);
 }
 
-/* Quick Links Widget */
-.widget-links-list {
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.widget-links-list a {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem;
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 6px;
-  color: var(--text-primary);
-  text-decoration: none;
-  transition: background 0.2s ease;
-}
-
-.widget-links-list a:hover {
-  background: rgba(255, 255, 255, 0.1);
-}
 
 /* Markdown Widget */
 .widget-markdown .widget-content {
@@ -1785,9 +1720,7 @@ body.light-mode .ado-widget-item:hover {
   justify-content: center;
 }
 
-.ado-widget-empty,
-.ado-widget-loading,
-.ado-widget-error {
+.ado-widget-empty {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1870,60 +1803,6 @@ body.light-mode .ado-widget-item:hover {
   margin-left: auto;
 }
 
-.widget-adopr-signin {
-  display: inline-block;
-  margin-top: 0.5rem;
-  padding: 0.5rem 1rem;
-  background: transparent;
-  color: var(--accent);
-  border: 1px solid var(--accent);
-  border-radius: 6px;
-  text-decoration: none;
-  font-size: 0.8rem;
-  transition: background 0.2s ease, color 0.2s ease;
-}
-
-.widget-adopr-signin:hover {
-  background: var(--accent);
-  color: white;
-}
-
-.widget-adopr-signin-btn {
-  margin-top: 0.5rem;
-  padding: 0.5rem 1rem;
-  background: #0078d4;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 0.8rem;
-  transition: background 0.2s ease;
-}
-
-.widget-adopr-signin-btn:hover {
-  background: #106ebe;
-}
-
-.widget-adopr-signout-btn {
-  background: transparent;
-  border: none;
-  color: var(--text-secondary);
-  cursor: pointer;
-  font-size: 0.9rem;
-  padding: 0.25rem;
-  border-radius: 4px;
-  transition: color 0.2s ease;
-}
-
-.widget-adopr-signout-btn:hover {
-  color: var(--text-primary);
-}
-
-.widget-adopr-actions {
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-}
 
 /* ==========================================================================
    ADO Bugs Widget — Bug / Work Item specific styles

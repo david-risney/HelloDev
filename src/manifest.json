@@ -12,7 +12,8 @@
     "https://accounts.google.com/*",
     "https://oauth2.googleapis.com/*",
     "https://*.googlesource.com/*",
-    "https://issuetracker.googleapis.com/*"
+    "https://issuetracker.googleapis.com/*",
+    "https://issues.chromium.org/*"
   ],
   "action": {
     "default_title": "HelloDev",

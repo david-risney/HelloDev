@@ -1,4 +1,4 @@
-import { WidgetBase } from './WidgetBase.js';
+import { DataWidgetBase } from './DataWidgetBase.js';
 import { GerritAuthHelper } from '../GerritAuthHelper.js';
 import { TimeFormatter } from '../TimeFormatter.js';
 
@@ -13,7 +13,7 @@ import { TimeFormatter } from '../TimeFormatter.js';
  * Gerrit REST API returns JSON prefixed with )]}\' which must be stripped.
  * Authenticated requests use the /a/ prefix on all endpoints.
  */
-export class GerritCLWidget extends WidgetBase {
+export class GerritCLWidget extends DataWidgetBase {
   static metadata = {
     name: 'Gerrit CLs',
     icon: '🔍',
@@ -22,16 +22,6 @@ export class GerritCLWidget extends WidgetBase {
 
   constructor(config) {
     super({ ...config, type: 'gerritcl' });
-
-    // State
-    this.items = [];
-    this.loading = false;
-    this.loadingStatus = '';
-    this.error = null;
-    this.errorDialogOpen = false;
-    this.lastFetched = null;
-    this.lastServerFetch = null;
-    this.intervalId = null;
 
     // Defaults
     this.data.gerritHost ??= 'https://chromium-review.googlesource.com';
@@ -43,17 +33,44 @@ export class GerritCLWidget extends WidgetBase {
     this.data.title ??= '';
     this.data.maxAgeDays ??= 0;
 
-    // Restore cache
     this.restoreFromCache();
   }
 
   // ---------------------------------------------------------------------------
-  // Configuration
+  // DataWidgetBase overrides
   // ---------------------------------------------------------------------------
 
   get isConfigured() {
     return !!(this.data.gerritHost && this.data.query);
   }
+
+  getCachePrefix() { return 'gerritcl'; }
+  getDefaultTitle() { return 'Gerrit CLs'; }
+  getEmptyMessage() { return 'No CLs found'; }
+  getConfigureMessage() { return 'Configure a Gerrit host and query to see CLs'; }
+
+  getItemDateField(item) {
+    return item.updated || item.created;
+  }
+
+  getTitleUrl() {
+    if (!this.data.gerritHost || !this.data.query) return null;
+    const host = this.data.gerritHost.replace(/\/+$/, '');
+    return `${host}/q/${encodeURIComponent(this.data.query)}`;
+  }
+
+  onContentUpdated(contentEl) {
+    contentEl.querySelectorAll('.ado-widget-avatar').forEach(img => {
+      img.addEventListener('error', () => {
+        img.style.display = 'none';
+        img.nextElementSibling.style.display = 'flex';
+      });
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Configuration
+  // ---------------------------------------------------------------------------
 
   getConfigSchema() {
     return [
@@ -94,45 +111,6 @@ export class GerritCLWidget extends WidgetBase {
   }
 
   // ---------------------------------------------------------------------------
-  // Cache
-  // ---------------------------------------------------------------------------
-
-  getCacheKey() {
-    return `gerritcl_cache_${this.id}`;
-  }
-
-  restoreFromCache() {
-    try {
-      const raw = localStorage.getItem(this.getCacheKey());
-      if (!raw) return;
-      const cached = JSON.parse(raw);
-      this.items = cached.items || [];
-      this.lastFetched = cached.lastFetched || null;
-    } catch (e) {
-      console.error('[GerritCLWidget] Cache restore error:', e);
-    }
-  }
-
-  saveToCache() {
-    try {
-      localStorage.setItem(this.getCacheKey(), JSON.stringify({
-        items: this.items,
-        lastFetched: this.lastFetched
-      }));
-    } catch (e) {
-      console.error('[GerritCLWidget] Cache save error:', e);
-    }
-  }
-
-  clearCache() {
-    try {
-      localStorage.removeItem(this.getCacheKey());
-    } catch (e) {
-      console.error('[GerritCLWidget] Cache clear error:', e);
-    }
-  }
-
-  // ---------------------------------------------------------------------------
   // Fetch lifecycle
   // ---------------------------------------------------------------------------
 
@@ -159,26 +137,7 @@ export class GerritCLWidget extends WidgetBase {
       this.lastServerFetch = this.lastFetched;
       this.saveToCache();
     } catch (err) {
-      const originalError = err.details
-        ? `\n\n--- Original Error ---\n${err.details}`
-        : `\n\n--- Original Error ---\n${err.message || 'Unknown error'}\n${err.stack || ''}`;
-
-      if (!navigator.onLine) {
-        this.error = {
-          message: 'You appear to be offline',
-          details: 'Please check your internet connection and try again. Cached data (if available) is still being displayed.' + originalError
-        };
-      } else if (err.name === 'TypeError' && err.message.includes('fetch')) {
-        this.error = {
-          message: 'Network error',
-          details: 'Could not connect to Gerrit. This may be a DNS issue, firewall, or the service may be temporarily unavailable.' + originalError
-        };
-      } else {
-        this.error = {
-          message: err.message || 'Failed to fetch CLs',
-          details: err.details || err.stack || null
-        };
-      }
+      this.error = this.buildRefreshError(err, 'Gerrit');
       this.errorDialogOpen = true;
       GerritAuthHelper.handleAuthError(this.error.message);
     } finally {
@@ -199,9 +158,7 @@ export class GerritCLWidget extends WidgetBase {
       q: this.data.query,
       n: String(this.data.maxCount || 25),
       o: 'DETAILED_LABELS',
-      // Additional option params — Gerrit allows repeated 'o' keys
     });
-    // Gerrit supports repeated query params; URLSearchParams.append works
     params.append('o', 'DETAILED_ACCOUNTS');
     params.append('o', 'CURRENT_REVISION');
     params.append('o', 'CURRENT_COMMIT');
@@ -227,9 +184,6 @@ export class GerritCLWidget extends WidgetBase {
     return this.parseGerritResponse(text);
   }
 
-  /**
-   * Strip Gerrit's XSSI guard prefix )]}' and parse JSON.
-   */
   parseGerritResponse(text) {
     const cleaned = text.replace(/^\)\]\}'\n?/, '');
     try {
@@ -242,12 +196,12 @@ export class GerritCLWidget extends WidgetBase {
   async resolveAvatars(authHeader) {
     const host = this.data.gerritHost.replace(/\/+$/, '');
     const prefix = authHeader ? '/a' : '';
-    const seen = new Map(); // _account_id -> [owner objects]
+    const seen = new Map();
 
     for (const cl of this.items) {
       const owner = cl.owner;
       if (!owner?._account_id) continue;
-      if (owner.avatarDataUrl) continue; // already resolved (e.g. from cache)
+      if (owner.avatarDataUrl) continue;
       const id = owner._account_id;
       if (!seen.has(id)) seen.set(id, []);
       seen.get(id).push(owner);
@@ -282,111 +236,6 @@ export class GerritCLWidget extends WidgetBase {
   }
 
   // ---------------------------------------------------------------------------
-  // Rendering
-  // ---------------------------------------------------------------------------
-
-  getFilteredItems() {
-    if (!this.data.maxAgeDays || this.data.maxAgeDays <= 0) {
-      return this.items;
-    }
-    const cutoffTime = Date.now() - this.data.maxAgeDays * 24 * 60 * 60 * 1000;
-    return this.items.filter(cl => {
-      const dateStr = cl.updated || cl.created;
-      if (!dateStr) return true;
-      return new Date(dateStr).getTime() >= cutoffTime;
-    });
-  }
-
-  getContent() {
-    if (!this.isConfigured) {
-      return `
-        <div class="ado-widget-empty">
-          <div class="ado-widget-icon">🔧</div>
-          <p>Configure a Gerrit host and query to see CLs</p>
-        </div>
-      `;
-    }
-
-    const lastFetchedStr = this.lastFetched
-      ? TimeFormatter.formatRelative(this.lastFetched)
-      : '';
-    const lastFetchedTooltip = this.lastFetched
-      ? `Last updated ${TimeFormatter.formatAbsoluteShort(this.lastFetched)}`
-      : 'Last updated';
-
-    const displayTitle = this.escapeHtml(this.data.title || 'Gerrit CLs');
-    const titleUrl = this.getTitleUrl();
-    const titleHtml = titleUrl
-      ? `<a href="${titleUrl}" target="_blank" class="ado-widget-title-link">${displayTitle}</a>`
-      : `<span class="ado-widget-title">${displayTitle}</span>`;
-
-    let statusHtml = '';
-    if (this.loading) {
-      statusHtml = `<span class="ado-widget-status-indicator ado-widget-status-loading" title="${this.loadingStatus || 'Loading...'}">⟳</span>`;
-    } else if (this.error) {
-      statusHtml = `<button class="ado-widget-status-indicator ado-widget-status-error ado-widget-error-btn" title="Click to see error details">⚠️</button>`;
-    }
-
-    let errorDialogHtml = '';
-    if (this.error && this.errorDialogOpen) {
-      const errorMessage = this.escapeHtml(this.error.message || this.error);
-      const errorDetails = this.error.details
-        ? `<pre class="ado-widget-error-details">${this.escapeHtml(this.error.details)}</pre>` : '';
-      errorDialogHtml = `
-        <div class="ado-widget-error-dialog">
-          <div class="ado-widget-error-dialog-header">
-            <span>Error</span>
-            <button class="ado-widget-error-dialog-close" title="Close">✕</button>
-          </div>
-          <div class="ado-widget-error-dialog-content">
-            <p class="ado-widget-error-message">${errorMessage}</p>
-            ${errorDetails}
-          </div>
-          <div class="ado-widget-error-dialog-actions">
-            <button class="ado-widget-error-copy" title="Copy error to clipboard">Copy</button>
-            <button class="ado-widget-retry">Retry</button>
-          </div>
-        </div>
-      `;
-    }
-
-    const filteredItems = this.getFilteredItems();
-
-    let listContent;
-    if (filteredItems.length === 0 && !this.loading) {
-      listContent = `
-        <div class="ado-widget-empty">
-          <div class="ado-widget-icon">✓</div>
-          <p>No CLs found</p>
-        </div>
-      `;
-    } else {
-      listContent = `
-        <ul class="ado-widget-list">
-          ${filteredItems.map(cl => this.renderItem(cl)).join('')}
-        </ul>
-      `;
-    }
-
-    return `
-      <div class="ado-widget-header">
-        ${titleHtml}
-        <span class="ado-widget-last-updated" title="${lastFetchedTooltip}">${lastFetchedStr}</span>
-        ${statusHtml}
-        <button class="ado-widget-refresh" title="Reload">⟳</button>
-      </div>
-      ${listContent}
-      ${errorDialogHtml}
-    `;
-  }
-
-  getTitleUrl() {
-    if (!this.data.gerritHost || !this.data.query) return null;
-    const host = this.data.gerritHost.replace(/\/+$/, '');
-    return `${host}/q/${encodeURIComponent(this.data.query)}`;
-  }
-
-  // ---------------------------------------------------------------------------
   // Render a single CL item
   // ---------------------------------------------------------------------------
 
@@ -400,13 +249,9 @@ export class GerritCLWidget extends WidgetBase {
     const host = this.data.gerritHost.replace(/\/+$/, '');
     const url = `${host}/c/${cl.project || ''}/+/${number}`;
 
-    // Code-Review label
     const crLabel = this.getCodeReviewLabel(cl);
-
-    // Insertions / Deletions
     const statsHtml = this.getStatsHtml(cl);
 
-    // Unresolved comments count
     const unresolvedCount = cl.unresolved_comment_count || 0;
     const commentsHtml = unresolvedCount > 0
       ? `<span class="gerrit-cl-comments" title="${unresolvedCount} unresolved comment${unresolvedCount !== 1 ? 's' : ''}">💬${unresolvedCount}</span>`
@@ -440,14 +285,10 @@ export class GerritCLWidget extends WidgetBase {
     `;
   }
 
-  /**
-   * Return an HTML badge for the Code-Review label.
-   */
   getCodeReviewLabel(cl) {
     const labels = cl.labels?.['Code-Review'];
     if (!labels) return '';
 
-    // Check for approvals/rejections
     if (labels.rejected) return '<span class="gerrit-cl-label gerrit-cl-label-minus2" title="Code-Review -2">CR-2</span>';
     if (labels.disliked) return '<span class="gerrit-cl-label gerrit-cl-label-minus1" title="Code-Review -1">CR-1</span>';
     if (labels.approved) return '<span class="gerrit-cl-label gerrit-cl-label-plus2" title="Code-Review +2">CR+2</span>';
@@ -464,103 +305,5 @@ export class GerritCLWidget extends WidgetBase {
     if (ins > 0) parts.push(`<span class="gerrit-cl-stat-ins">+${ins}</span>`);
     if (del > 0) parts.push(`<span class="gerrit-cl-stat-del">-${del}</span>`);
     return `<span class="gerrit-cl-stats">${parts.join('')}</span>`;
-  }
-
-  // ---------------------------------------------------------------------------
-  // Behavior & auto-refresh
-  // ---------------------------------------------------------------------------
-
-  updateContent() {
-    if (!this.element) return;
-    const contentEl = this.element.querySelector('.widget-content');
-    if (!contentEl) return;
-    contentEl.innerHTML = this.getContent();
-    contentEl.querySelectorAll('.ado-widget-avatar').forEach(img => {
-      img.addEventListener('error', () => {
-        img.style.display = 'none';
-        img.nextElementSibling.style.display = 'flex';
-      });
-    });
-  }
-
-  setupBehavior(element) {
-    element.addEventListener('click', (e) => {
-      if (e.target.classList.contains('ado-widget-refresh') ||
-          e.target.classList.contains('ado-widget-retry')) {
-        e.preventDefault();
-        e.stopPropagation();
-        this.errorDialogOpen = false;
-        this.refresh();
-      }
-      if (e.target.classList.contains('ado-widget-error-btn')) {
-        e.preventDefault();
-        e.stopPropagation();
-        this.errorDialogOpen = !this.errorDialogOpen;
-        this.updateContent();
-      }
-      if (e.target.classList.contains('ado-widget-error-dialog-close')) {
-        e.preventDefault();
-        e.stopPropagation();
-        this.errorDialogOpen = false;
-        this.updateContent();
-      }
-      if (e.target.classList.contains('ado-widget-error-copy')) {
-        e.preventDefault();
-        e.stopPropagation();
-        const msg = this.error?.message || this.error || '';
-        const details = this.error?.details || '';
-        const text = details ? `${msg}\n\n${details}` : msg;
-        navigator.clipboard.writeText(text).then(() => {
-          e.target.textContent = 'Copied!';
-          setTimeout(() => { e.target.textContent = 'Copy'; }, 1500);
-        });
-      }
-    });
-
-    if (this.isConfigured) {
-      if (!this.lastFetched) {
-        this.refresh();
-      } else {
-        this.updateContent();
-      }
-    }
-    this.startAutoRefresh();
-  }
-
-  startAutoRefresh() {
-    if (this.intervalId) clearInterval(this.intervalId);
-    this.intervalId = setInterval(() => {
-      this.updateContent();
-      if (!this.isConfigured) return;
-      if (!this.data.refreshInterval || this.data.refreshInterval <= 0) return;
-      const intervalMs = this.data.refreshInterval * 60 * 1000;
-      if (!this.lastServerFetch || (Date.now() - this.lastServerFetch) >= intervalMs) {
-        this.refresh();
-      }
-    }, 60000);
-  }
-
-  destroy() {
-    if (this.intervalId) {
-      clearInterval(this.intervalId);
-      this.intervalId = null;
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // Utilities
-  // ---------------------------------------------------------------------------
-
-  escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-  }
-
-  getInitials(name) {
-    if (!name) return '?';
-    const parts = name.trim().split(/\s+/);
-    if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
-    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
   }
 }

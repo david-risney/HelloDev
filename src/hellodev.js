@@ -123,13 +123,7 @@ function loadWidgets() {
     configs = [...DEFAULT_WIDGETS];
   }
 
-  state.widgets = configs.map(config => {
-    const widget = createWidget(config);
-    if (widget.saveWidgets !== undefined) {
-      widget.saveWidgets = saveWidgets;
-    }
-    return widget;
-  });
+  state.widgets = configs.map(config => createWidget(config));
 }
 
 // Debounced save to avoid redundant writes during rapid operations
@@ -338,9 +332,6 @@ function addWidget(type) {
 
   const config = { id, type, x: pos.x, y: pos.y, width, height, data };
   const newWidget = createWidget(config);
-  if (newWidget.saveWidgets !== undefined) {
-    newWidget.saveWidgets = saveWidgets;
-  }
   state.widgets.push(newWidget);
   saveWidgets();
   renderDashboard();

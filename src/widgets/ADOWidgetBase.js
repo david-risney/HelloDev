@@ -1,15 +1,19 @@
-import { WidgetBase } from './WidgetBase.js';
+import { DataWidgetBase } from './DataWidgetBase.js';
 import { ADOAuthHelper } from '../ADOAuthHelper.js';
 import { TimeFormatter } from '../TimeFormatter.js';
 
 /**
  * Abstract base class for Azure DevOps widgets.
- * Provides shared infrastructure: auth, caching, fetch lifecycle, error handling,
- * auto-refresh, and common UI (header, list, error dialog, empty states).
+ * Extends DataWidgetBase with ADO-specific auth, API helpers, and user resolution.
  *
- * Subclasses must implement the abstract methods listed below.
+ * Subclasses must implement:
+ *   - applyDefaults()           — set subclass-specific this.data defaults
+ *   - getCachePrefix()          — e.g. 'adopr' or 'adobugs'
+ *   - fetchItems(accessToken)   — fetch and return items array
+ *   - renderItem(item)          — render a single item as HTML
+ *   - getItemSpecificConfigSchema() — additional config fields
  */
-export class ADOWidgetBase extends WidgetBase {
+export class ADOWidgetBase extends DataWidgetBase {
   static metadata = {
     name: 'ADO Widget',
     icon: '🔷',
@@ -18,17 +22,9 @@ export class ADOWidgetBase extends WidgetBase {
 
   constructor(config) {
     super(config);
-    this.items = [];
-    this.loading = false;
-    this.loadingStatus = '';
-    this.error = null;
-    this.errorDialogOpen = false;
-    this.lastFetched = null;
-    this.lastServerFetch = null;
-    this.intervalId = null;
     this._userIdCache = {};
 
-    // Common defaults
+    // Common ADO defaults
     this.data.organization ??= '';
     this.data.project ??= '';
     this.data.maxCount ??= 10;
@@ -44,52 +40,52 @@ export class ADOWidgetBase extends WidgetBase {
   // Abstract methods — subclasses MUST implement these
   // ---------------------------------------------------------------------------
 
-  /** Apply subclass-specific this.data defaults. */
   applyDefaults() {}
-
-  /** Cache key prefix, e.g. 'adopr' or 'adobugs'. */
-  getCachePrefix() { throw new Error('Subclasses must implement getCachePrefix()'); }
-
-  /** Default display title when none is configured. */
-  getDefaultTitle() { return 'Items'; }
-
-  /** Message shown when the item list is empty. */
-  getEmptyMessage() { return 'No items found'; }
-
-  /** Message shown when the widget is not yet configured. */
-  getConfigureMessage() { return 'Configure organization and project'; }
-
-  /** Return an array of config-schema field objects specific to this subclass. */
   getItemSpecificConfigSchema() { return []; }
 
-  /**
-   * Fetch items from the ADO API.
-   * @param {string} accessToken - A valid Bearer token
-   * @returns {Promise<Array>} The transformed items array
-   */
   async fetchItems(accessToken) { throw new Error('Subclasses must implement fetchItems()'); }
 
-  /**
-   * Render a single list item as an HTML string.
-   * @param {Object} item
-   * @returns {string} HTML
-   */
-  renderItem(item) { throw new Error('Subclasses must implement renderItem()'); }
-
   // ---------------------------------------------------------------------------
-  // Optional overrides
+  // DataWidgetBase overrides
   // ---------------------------------------------------------------------------
 
-  /** URL for the clickable title link, or null for a plain text title. */
-  getTitleUrl() { return null; }
+  getDefaultTitle() { return 'Items'; }
+  getEmptyMessage() { return 'No items found'; }
+  getConfigureMessage() { return 'Configure organization and project'; }
 
-  /** Return the date field used for max-age filtering. */
   getItemDateField(item) {
     return item.creationDate || item.createdDate || null;
   }
 
   get isConfigured() {
     return !!(this.data.organization && this.data.project);
+  }
+
+  onContentUpdated(contentEl) {
+    contentEl.querySelectorAll('.ado-widget-avatar').forEach(img => {
+      img.addEventListener('error', () => {
+        img.style.display = 'none';
+        img.nextElementSibling.style.display = 'flex';
+      });
+    });
+  }
+
+  restoreFromCache() {
+    try {
+      const cached = localStorage.getItem(this.getCacheKey());
+      if (cached) {
+        const data = JSON.parse(cached);
+        if (Array.isArray(data.items)) {
+          this.items = data.items;
+        } else if (Array.isArray(data.prs)) {
+          // Migration: old ADOPRWidget cache format
+          this.items = data.prs;
+        }
+        this.lastFetched = data.lastFetched || null;
+      }
+    } catch (e) {
+      console.error(`[${this.constructor.name}] Cache restore error:`, e);
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -113,51 +109,14 @@ export class ADOWidgetBase extends WidgetBase {
     this.items = [];
     this.lastFetched = null;
     this.lastServerFetch = null;
-    localStorage.removeItem(this.getCacheKey());
+    this.clearCache();
     if (this.isConfigured && this.element) {
       this.refresh();
     }
   }
 
   // ---------------------------------------------------------------------------
-  // Cache
-  // ---------------------------------------------------------------------------
-
-  getCacheKey() {
-    return `${this.getCachePrefix()}_cache_${this.id}`;
-  }
-
-  restoreFromCache() {
-    try {
-      const cached = localStorage.getItem(this.getCacheKey());
-      if (cached) {
-        const data = JSON.parse(cached);
-        if (Array.isArray(data.items)) {
-          this.items = data.items;
-        } else if (Array.isArray(data.prs)) {
-          // Migration: old ADOPRWidget cache format
-          this.items = data.prs;
-        }
-        this.lastFetched = data.lastFetched || null;
-      }
-    } catch (e) {
-      console.error(`[${this.constructor.name}] Cache restore error:`, e);
-    }
-  }
-
-  saveToCache() {
-    try {
-      localStorage.setItem(this.getCacheKey(), JSON.stringify({
-        items: this.items,
-        lastFetched: this.lastFetched
-      }));
-    } catch (e) {
-      console.error(`[${this.constructor.name}] Cache save error:`, e);
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // Fetch lifecycle (template method)
+  // Fetch lifecycle
   // ---------------------------------------------------------------------------
 
   async refresh() {
@@ -175,28 +134,8 @@ export class ADOWidgetBase extends WidgetBase {
       this.lastServerFetch = this.lastFetched;
       this.saveToCache();
     } catch (err) {
-      const originalError = err.details
-        ? `\n\n--- Original Error ---\n${err.details}`
-        : `\n\n--- Original Error ---\n${err.message || 'Unknown error'}\n${err.stack || ''}`;
-
-      if (!navigator.onLine) {
-        this.error = {
-          message: 'You appear to be offline',
-          details: 'Please check your internet connection and try again. Cached data (if available) is still being displayed.' + originalError
-        };
-      } else if (err.name === 'TypeError' && err.message.includes('fetch')) {
-        this.error = {
-          message: 'Network error',
-          details: 'Could not connect to Azure DevOps. This may be a DNS issue, firewall blocking the connection, or the service may be temporarily unavailable.' + originalError
-        };
-      } else {
-        this.error = {
-          message: err.message || 'Failed to fetch items',
-          details: err.details || err.stack || null
-        };
-      }
+      this.error = this.buildRefreshError(err, 'Azure DevOps');
       this.errorDialogOpen = true;
-      ADOAuthHelper.handleAuthError(this.error.message);
     } finally {
       this.loading = false;
       this.loadingStatus = '';
@@ -205,194 +144,71 @@ export class ADOWidgetBase extends WidgetBase {
   }
 
   // ---------------------------------------------------------------------------
-  // Rendering
+  // ADO API fetch with auth headers and 401 retry
   // ---------------------------------------------------------------------------
 
-  getFilteredItems() {
-    if (!this.data.maxAgeDays || this.data.maxAgeDays <= 0) {
-      return this.items;
-    }
-    const maxAgeMs = this.data.maxAgeDays * 24 * 60 * 60 * 1000;
-    const cutoffTime = Date.now() - maxAgeMs;
-    return this.items.filter(item => {
-      const dateStr = this.getItemDateField(item);
-      if (!dateStr) return true;
-      return new Date(dateStr).getTime() >= cutoffTime;
+  async adoFetch(url, accessToken, options = {}) {
+    const buildHeaders = (token) => ({
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      ...options.headers
     });
-  }
 
-  getContent() {
-    if (!this.isConfigured) {
-      return `
-        <div class="ado-widget-empty">
-          <div class="ado-widget-icon">🔧</div>
-          <p>${this.getConfigureMessage()}</p>
-        </div>
-      `;
-    }
+    let response = await fetch(url, {
+      ...options,
+      headers: buildHeaders(accessToken)
+    });
 
-    const lastFetchedStr = this.lastFetched
-      ? TimeFormatter.formatRelative(this.lastFetched)
-      : '';
-    const lastFetchedTooltip = this.lastFetched
-      ? `Last updated ${TimeFormatter.formatAbsoluteShort(this.lastFetched)}`
-      : 'Last updated';
-
-    const displayTitle = this.escapeHtml(this.data.title || this.getDefaultTitle());
-    const titleUrl = this.getTitleUrl();
-    const titleHtml = titleUrl
-      ? `<a href="${titleUrl}" target="_blank" class="ado-widget-title-link">${displayTitle}</a>`
-      : `<span class="ado-widget-title">${displayTitle}</span>`;
-
-    let statusHtml = '';
-    if (this.loading) {
-      statusHtml = `<span class="ado-widget-status-indicator ado-widget-status-loading" title="${this.loadingStatus || 'Loading...'}">⟳</span>`;
-    } else if (this.error) {
-      statusHtml = `<button class="ado-widget-status-indicator ado-widget-status-error ado-widget-error-btn" title="Click to see error details">⚠️</button>`;
-    }
-
-    let errorDialogHtml = '';
-    if (this.error && this.errorDialogOpen) {
-      const errorMessage = this.escapeHtml(this.error.message || this.error);
-      const errorDetails = this.error.details ? `<pre class="ado-widget-error-details">${this.escapeHtml(this.error.details)}</pre>` : '';
-      errorDialogHtml = `
-        <div class="ado-widget-error-dialog">
-          <div class="ado-widget-error-dialog-header">
-            <span>Error</span>
-            <button class="ado-widget-error-dialog-close" title="Close">✕</button>
-          </div>
-          <div class="ado-widget-error-dialog-content">
-            <p class="ado-widget-error-message">${errorMessage}</p>
-            ${errorDetails}
-          </div>
-          <div class="ado-widget-error-dialog-actions">
-            <button class="ado-widget-error-copy" title="Copy error to clipboard">Copy</button>
-            <button class="ado-widget-retry">Retry</button>
-          </div>
-        </div>
-      `;
-    }
-
-    const filteredItems = this.getFilteredItems();
-
-    let listContent;
-    if (filteredItems.length === 0 && !this.loading) {
-      listContent = `
-        <div class="ado-widget-empty">
-          <div class="ado-widget-icon">✓</div>
-          <p>${this.getEmptyMessage()}</p>
-        </div>
-      `;
-    } else {
-      listContent = `
-        <ul class="ado-widget-list">
-          ${filteredItems.map(item => this.renderItem(item)).join('')}
-        </ul>
-      `;
-    }
-
-    return `
-      <div class="ado-widget-header">
-        ${titleHtml}
-        <span class="ado-widget-last-updated" title="${lastFetchedTooltip}">${lastFetchedStr}</span>
-        ${statusHtml}
-        <button class="ado-widget-refresh" title="Reload">⟳</button>
-      </div>
-      ${listContent}
-      ${errorDialogHtml}
-    `;
-  }
-
-  updateContent() {
-    if (!this.element) return;
-    const contentEl = this.element.querySelector('.widget-content');
-    if (!contentEl) return;
-    contentEl.innerHTML = this.getContent();
-    contentEl.querySelectorAll('.ado-widget-avatar').forEach(img => {
-      img.addEventListener('error', () => {
-        img.style.display = 'none';
-        img.nextElementSibling.style.display = 'flex';
+    // On 401, clear cache and retry once with a fresh token
+    if (response.status === 401) {
+      ADOAuthHelper.clearCache();
+      accessToken = await ADOAuthHelper.getToken();
+      response = await fetch(url, {
+        ...options,
+        headers: buildHeaders(accessToken)
       });
-    });
-  }
-
-  // ---------------------------------------------------------------------------
-  // Behavior
-  // ---------------------------------------------------------------------------
-
-  setupBehavior(element) {
-    element.addEventListener('click', (e) => {
-      if (e.target.classList.contains('ado-widget-refresh') ||
-          e.target.classList.contains('ado-widget-retry')) {
-        e.preventDefault();
-        e.stopPropagation();
-        this.errorDialogOpen = false;
-        this.refresh();
-      }
-      if (e.target.classList.contains('ado-widget-error-btn')) {
-        e.preventDefault();
-        e.stopPropagation();
-        this.errorDialogOpen = !this.errorDialogOpen;
-        this.updateContent();
-      }
-      if (e.target.classList.contains('ado-widget-error-dialog-close')) {
-        e.preventDefault();
-        e.stopPropagation();
-        this.errorDialogOpen = false;
-        this.updateContent();
-      }
-      if (e.target.classList.contains('ado-widget-error-copy')) {
-        e.preventDefault();
-        e.stopPropagation();
-        const msg = this.error?.message || this.error || '';
-        const details = this.error?.details || '';
-        const text = details ? `${msg}\n\n${details}` : msg;
-        navigator.clipboard.writeText(text).then(() => {
-          e.target.textContent = 'Copied!';
-          setTimeout(() => { e.target.textContent = 'Copy'; }, 1500);
-        });
-      }
-    });
-
-    if (this.isConfigured) {
-      if (!this.lastFetched) {
-        this.refresh();
-      } else {
-        this.updateContent();
-      }
     }
-    this.startAutoRefresh();
-  }
 
-  startAutoRefresh() {
-    if (this.intervalId) clearInterval(this.intervalId);
-    this.intervalId = setInterval(() => {
-      this.updateContent();
-      if (!this.isConfigured) return;
-      if (!this.data.refreshInterval || this.data.refreshInterval <= 0) return;
-      const intervalMs = this.data.refreshInterval * 60 * 1000;
-      if (!this.lastServerFetch || (Date.now() - this.lastServerFetch) >= intervalMs) {
-        this.refresh();
+    if (!response.ok) {
+      let body = '';
+      try {
+        const json = await response.json();
+        body = json.message || json.errorMessage || JSON.stringify(json);
+      } catch {
+        try { body = await response.text(); } catch { /* ignore */ }
       }
-    }, 60000);
-  }
 
-  destroy() {
-    if (this.intervalId) {
-      clearInterval(this.intervalId);
-      this.intervalId = null;
+      let message;
+      switch (response.status) {
+        case 401:
+          message = 'Authentication failed. Try running: az login';
+          break;
+        case 403:
+          message = 'Access denied. Check your permissions.';
+          break;
+        case 404:
+          message = 'Resource not found. Check organization, project, and query settings.';
+          break;
+        case 400:
+          message = `Bad request: ${body || 'Check your filter settings.'}`;
+          break;
+        default:
+          message = `API error ${response.status}${body ? ': ' + body : ''}`;
+      }
+
+      const err = new Error(message);
+      err.status = response.status;
+      err.details = `HTTP ${response.status} from ${response.url || url}${body ? '\n' + body : ''}`;
+      throw err;
     }
+
+    const data = await response.json();
+    return { data, token: accessToken };
   }
 
   // ---------------------------------------------------------------------------
-  // Utilities
+  // ADO-specific utilities
   // ---------------------------------------------------------------------------
-
-  escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-  }
 
   async fetchAvatarAsDataUrl(imageUrl, accessToken) {
     try {
@@ -427,15 +243,6 @@ export class ADOWidgetBase extends WidgetBase {
         for (const id of ids) id.imageUrl = null;
       }
     }));
-  }
-
-  getInitials(name) {
-    if (!name) return '?';
-    const parts = name.trim().split(/\s+/);
-    if (parts.length === 1) {
-      return parts[0].substring(0, 2).toUpperCase();
-    }
-    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
   }
 
   formatAge(dateString) {

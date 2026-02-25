@@ -63,11 +63,7 @@ export class ADOBugsWidget extends ADOWidgetBase {
   async fetchItems(accessToken) {
     const org = encodeURIComponent(this.data.organization);
     const project = encodeURIComponent(this.data.project);
-    const headers = {
-      'Authorization': `Bearer ${accessToken}`,
-      'Content-Type': 'application/json'
-    };
-
+    let token = accessToken;
     let workItemIds;
 
     if (this.data.queryId) {
@@ -76,15 +72,8 @@ export class ADOBugsWidget extends ADOWidgetBase {
       this.updateContent();
 
       const queryUrl = `https://dev.azure.com/${org}/${project}/_apis/wit/wiql/${encodeURIComponent(this.data.queryId)}?api-version=7.0`;
-      const queryResponse = await fetch(queryUrl, { headers });
-
-      if (!queryResponse.ok) {
-        if (queryResponse.status === 401) throw new Error('Authentication failed. Try running: az login');
-        if (queryResponse.status === 404) throw new Error('Query not found. Check the query ID.');
-        throw new Error(`Query API error: ${queryResponse.status}`);
-      }
-
-      const queryData = await queryResponse.json();
+      const { data: queryData, token: t1 } = await this.adoFetch(queryUrl, token);
+      token = t1;
       workItemIds = (queryData.workItems || []).map(wi => wi.id);
     } else {
       // Path 2: Build WIQL from filters
@@ -93,19 +82,11 @@ export class ADOBugsWidget extends ADOWidgetBase {
 
       const wiql = this.buildWiql();
       const wiqlUrl = `https://dev.azure.com/${org}/${project}/_apis/wit/wiql?api-version=7.0&$top=${this.data.maxCount || 10}`;
-      const wiqlResponse = await fetch(wiqlUrl, {
+      const { data: wiqlData, token: t2 } = await this.adoFetch(wiqlUrl, token, {
         method: 'POST',
-        headers,
         body: JSON.stringify({ query: wiql })
       });
-
-      if (!wiqlResponse.ok) {
-        if (wiqlResponse.status === 401) throw new Error('Authentication failed. Try running: az login');
-        if (wiqlResponse.status === 400) throw new Error('Invalid query. Check your filter settings.');
-        throw new Error(`WIQL API error: ${wiqlResponse.status}`);
-      }
-
-      const wiqlData = await wiqlResponse.json();
+      token = t2;
       workItemIds = (wiqlData.workItems || []).map(wi => wi.id);
     }
 
@@ -121,9 +102,8 @@ export class ADOBugsWidget extends ADOWidgetBase {
     this.updateContent();
 
     const batchUrl = `https://dev.azure.com/${org}/${project}/_apis/wit/workitemsbatch?api-version=7.0`;
-    const batchResponse = await fetch(batchUrl, {
+    const { data: batchData, token: t3 } = await this.adoFetch(batchUrl, token, {
       method: 'POST',
-      headers,
       body: JSON.stringify({
         ids: idsToFetch,
         fields: [
@@ -139,12 +119,6 @@ export class ADOBugsWidget extends ADOWidgetBase {
       })
     });
 
-    if (!batchResponse.ok) {
-      throw new Error(`Work items batch API error: ${batchResponse.status}`);
-    }
-
-    const batchData = await batchResponse.json();
-
     const items = (batchData.value || []).map(wi => ({
       id: wi.id,
       title: wi.fields['System.Title'],
@@ -157,7 +131,7 @@ export class ADOBugsWidget extends ADOWidgetBase {
       url: `https://dev.azure.com/${this.data.organization}/${this.data.project}/_workitems/edit/${wi.id}`
     }));
 
-    await this.resolveIdentityAvatars(items.map(i => i.assignedTo).filter(Boolean), accessToken);
+    await this.resolveIdentityAvatars(items.map(i => i.assignedTo).filter(Boolean), t3);
 
     return items;
   }

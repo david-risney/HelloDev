@@ -1,5 +1,4 @@
 export { WidgetBase } from './WidgetBase.js';
-export { ADOWidgetBase } from './ADOWidgetBase.js';
 export { ClockWidget } from './ClockWidget.js';
 export { SearchWidget } from './SearchWidget.js';
 export { MarkdownWidget } from './MarkdownWidget.js';

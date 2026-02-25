@@ -2,3 +2,6 @@
 # These are created by install.ps1 or install.sh
 native-host/com.hellodev.ado.json
 native-host/ado_token_host.bat
+
+# OAuth credentials (contains client secrets)
+src/secrets.js

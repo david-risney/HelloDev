@@ -22,12 +22,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     });
     return true; // Keep message channel open for async response
   }
-  
-  if (request.type === 'ADO_CLEAR_TOKEN_CACHE') {
-    console.log('[background] Clear token cache requested');
-    sendResponse({ success: true });
-    return true;
-  }
 });
 
 // Get access token via native messaging host

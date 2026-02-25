@@ -61,13 +61,14 @@ export class ADOPRWidget extends ADOWidgetBase {
   }
 
   async fetchItems(accessToken) {
+    let token = accessToken;
     let creatorId = null;
     let reviewerId = null;
 
     if (this.data.creatorEmail) {
       this.loadingStatus = 'Looking up creator...';
       this.updateContent();
-      creatorId = await this.resolveUserId(this.data.creatorEmail, accessToken);
+      creatorId = await this.resolveUserId(this.data.creatorEmail, token);
       if (!creatorId) {
         throw new Error(`Could not resolve creator email: ${this.data.creatorEmail}`);
       }
@@ -76,7 +77,7 @@ export class ADOPRWidget extends ADOWidgetBase {
     if (this.data.reviewerEmail) {
       this.loadingStatus = 'Looking up reviewer...';
       this.updateContent();
-      reviewerId = await this.resolveUserId(this.data.reviewerEmail, accessToken);
+      reviewerId = await this.resolveUserId(this.data.reviewerEmail, token);
       if (!reviewerId) {
         throw new Error(`Could not resolve reviewer email: ${this.data.reviewerEmail}`);
       }
@@ -85,27 +86,17 @@ export class ADOPRWidget extends ADOWidgetBase {
     this.loadingStatus = 'Fetching pull requests...';
     this.updateContent();
 
-    const response = await fetch(this.buildApiUrl(creatorId, reviewerId), {
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json'
-      }
-    });
-
-    if (!response.ok) {
-      if (response.status === 401) throw new Error('Authentication failed. Try running: az login');
-      if (response.status === 404) throw new Error('Project or repository not found.');
-      throw new Error(`API error: ${response.status}`);
-    }
-
-    const data = await response.json();
+    const { data, token: currentToken } = await this.adoFetch(
+      this.buildApiUrl(creatorId, reviewerId),
+      token
+    );
 
     const items = (data.value || []).map(pr => ({
       ...pr,
       url: `https://dev.azure.com/${this.data.organization}/${this.data.project}/_git/${pr.repository?.name || ''}/pullrequest/${pr.pullRequestId}`
     }));
 
-    await this.resolveIdentityAvatars(items.map(i => i.createdBy).filter(Boolean), accessToken);
+    await this.resolveIdentityAvatars(items.map(i => i.createdBy).filter(Boolean), currentToken);
 
     return items;
   }

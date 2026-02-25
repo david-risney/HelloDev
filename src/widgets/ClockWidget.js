@@ -223,13 +223,6 @@ export class ClockWidget extends WidgetBase {
           month: 'short',
           day: 'numeric'
         });
-      } else if (style === 'minimal') {
-        // Minimal style hides date (handled in CSS)
-        dateEl.textContent = now.toLocaleDateString([], {
-          weekday: 'long',
-          month: 'long',
-          day: 'numeric'
-        });
       } else {
         dateEl.textContent = now.toLocaleDateString([], {
           weekday: 'long',

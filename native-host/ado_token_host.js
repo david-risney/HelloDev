@@ -145,10 +145,11 @@ function writeMessage(message) {
  */
 function getAccessToken(resource) {
   const targetResource = resource || ADO_RESOURCE;
+  let azPath = null;
 
   try {
     // Find the az CLI executable
-    const azPath = findAzCli();
+    azPath = findAzCli();
     if (!azPath) {
       const installUrl = process.platform === 'win32'
         ? 'https://aka.ms/installazurecliwindows'
@@ -160,7 +161,7 @@ function getAccessToken(resource) {
     try {
       execSync(`${azPath} account show`, {
         encoding: 'utf8',
-        timeout: 10000,
+        timeout: 60000,
         stdio: ['pipe', 'pipe', 'pipe'],
         shell: true
       });
@@ -180,7 +181,7 @@ function getAccessToken(resource) {
         `${azPath} account get-access-token --resource ${targetResource} -o json`,
         {
           encoding: 'utf8',
-          timeout: 30000,
+          timeout: 60000,
           stdio: ['pipe', 'pipe', 'pipe'],
           shell: true
         }
