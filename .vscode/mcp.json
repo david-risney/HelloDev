@@ -1,0 +1,22 @@
+{
+	// Chrome DevTools MCP — used by Copilot to validate the extension in a real browser.
+	//
+	// --executablePath : Path to the Edge (Dev) binary. Update for your machine.
+	// --category-extensions : REQUIRED to enable extension management tools
+	//                         (install, uninstall, list, reload).
+	"servers": {
+		"io.github.ChromeDevTools/chrome-devtools-mcp": {
+			"type": "stdio",
+			"command": "npx",
+			"args": [
+				"--registry",
+				"https://registry.npmjs.org",
+				"chrome-devtools-mcp@0.18.1",
+				"--category-extensions",
+				"--executablePath=C:\\users\\davris\\AppData\\Local\\Microsoft\\Edge Dev\\Application\\msedge.exe"
+			],
+			"gallery": "https://api.mcp.github.com",
+			"version": "0.18.1"
+		}
+	}
+}

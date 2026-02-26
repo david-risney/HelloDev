@@ -1,8 +1,9 @@
 // Flyout panel system for HelloDev dashboard
 
-import { STORAGE_KEY, THEME_STORAGE_KEY } from './constants.js';
+import { STORAGE_KEY } from './constants.js';
 import { WidgetRegistry } from './widgets/index.js';
 import { getThemeModeDisplay, getNextThemeMode, saveTheme } from './theme.js';
+import { clearSync } from './syncStorage.js';
 
 // Button element references (set by init)
 let buttonEls = {};
@@ -118,7 +119,7 @@ const COLOR_PRESETS = [
 ];
 
 // Show Appearance flyout
-export function showCustomizeFlyout(state) {
+export function showCustomizeFlyout(state, { onThemeChanged } = {}) {
   const presetButtons = COLOR_PRESETS.map(preset =>
     `<button class="preset-btn" data-primary="${preset.primary}" data-accent="${preset.accent}" title="${preset.name}">
       <span class="preset-primary" style="background: ${preset.primary}"></span>
@@ -174,6 +175,7 @@ export function showCustomizeFlyout(state) {
             colorAccent: accent,
             themeMode: state.themeMode
           });
+          if (onThemeChanged) onThemeChanged();
         });
       });
 
@@ -184,6 +186,7 @@ export function showCustomizeFlyout(state) {
           colorAccent: accentInput.value,
           themeMode: state.themeMode
         });
+        if (onThemeChanged) onThemeChanged();
       });
 
       accentInput.addEventListener('input', () => {
@@ -192,6 +195,7 @@ export function showCustomizeFlyout(state) {
           colorAccent: accentInput.value,
           themeMode: state.themeMode
         });
+        if (onThemeChanged) onThemeChanged();
       });
 
       // Theme mode toggle (cycles through auto -> light -> dark)
@@ -204,6 +208,7 @@ export function showCustomizeFlyout(state) {
           colorAccent: accentInput.value,
           themeMode: state.themeMode
         });
+        if (onThemeChanged) onThemeChanged();
       });
     }
   });
@@ -338,7 +343,7 @@ export function showDataFlyout({ getExportData, importData } = {}) {
 
       confirmBtn.addEventListener('click', () => {
         localStorage.removeItem(STORAGE_KEY);
-        localStorage.removeItem(THEME_STORAGE_KEY);
+        clearSync();
         window.location.reload();
       });
     }

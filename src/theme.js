@@ -1,7 +1,5 @@
 // Theme management for HelloDev dashboard
 
-import { THEME_STORAGE_KEY, DEFAULT_THEME } from './constants.js';
-
 const osPrefersDark = window.matchMedia('(prefers-color-scheme: dark)');
 
 // Get effective light mode based on themeMode setting
@@ -38,39 +36,16 @@ export function applyTheme(theme, themeMode) {
   document.body.classList.toggle('light-mode', isLight);
 }
 
-// Save theme to storage and apply it
+// Save theme to state and apply it (persistence is handled by the unified save in hellodev.js)
 export function saveTheme(state, theme) {
-  state.currentTheme = theme;
-  try {
-    localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify(theme));
-  } catch (e) {
-    console.error('Failed to save theme:', e);
-  }
-  applyTheme(theme, state.themeMode);
-}
-
-// Load theme from storage and apply to state
-export function loadTheme(state) {
-  const stored = localStorage.getItem(THEME_STORAGE_KEY);
-  let theme = DEFAULT_THEME;
-
-  if (stored) {
-    try {
-      const parsed = JSON.parse(stored);
-      // Migrate old lightMode boolean to new themeMode
-      if ('lightMode' in parsed && !('themeMode' in parsed)) {
-        parsed.themeMode = parsed.lightMode ? 'light' : 'dark';
-        delete parsed.lightMode;
-      }
-      theme = { ...DEFAULT_THEME, ...parsed };
-    } catch (e) {
-      theme = DEFAULT_THEME;
-    }
-  }
-
   state.currentTheme = theme;
   state.themeMode = theme.themeMode || 'auto';
   applyTheme(theme, state.themeMode);
+}
+
+// Apply theme from state (called during init after unified state is loaded)
+export function loadTheme(state) {
+  applyTheme(state.currentTheme, state.themeMode);
 
   // Listen for OS theme changes when in auto mode
   osPrefersDark.addEventListener('change', () => {

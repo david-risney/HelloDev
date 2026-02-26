@@ -1,7 +1,7 @@
 // HelloDev Dashboard - Main orchestrator
 
 import { createWidget, WidgetRegistry } from './widgets/index.js';
-import { STORAGE_KEY, STORAGE_VERSION, DEFAULT_THEME, GRID_CELL_SIZE, GRID_GAP, DASHBOARD_PADDING } from './constants.js';
+import { STORAGE_KEY, STORAGE_VERSION, THEME_STORAGE_KEY, DEFAULT_THEME, GRID_CELL_SIZE, GRID_GAP, DASHBOARD_PADDING } from './constants.js';
 import { setupWidgetDrag } from './dragDrop.js';
 import { openWidgetConfig as openWidgetConfigDialog, setupWidgetConfigDelegation } from './widgetConfig.js';
 import { loadTheme } from './theme.js';
@@ -13,7 +13,8 @@ import {
   showAboutFlyout,
   showDataFlyout
 } from './flyouts.js';
-import { DEFAULT_WIDGETS } from './defaultWidgets.js';
+import { DEFAULT_STATE } from './defaultState.js';
+import { saveToSync, loadFromSync, onSyncChanged } from './syncStorage.js';
 
 // ============================================================================
 // Dashboard State
@@ -45,13 +46,24 @@ const aboutBtn = document.getElementById('aboutBtn');
 
 document.addEventListener('DOMContentLoaded', init);
 
-function init() {
+async function init() {
   initFlyouts({ addWidgetBtn, customizeBtn, dataBtn, aboutBtn });
+  await loadDashboard();
   loadTheme(state);
-  loadWidgets();
   renderDashboard();
   setupEventListeners();
   setupWidgetConfigDelegation();
+
+  // Listen for state changes synced from other devices
+  onSyncChanged((syncedState) => {
+    applyLoadedState(syncedState);
+    // Update localStorage to match
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(syncedState));
+    } catch (_) { /* best-effort */ }
+    loadTheme(state);
+    renderDashboard();
+  });
 }
 
 // ============================================================================
@@ -73,51 +85,84 @@ function showStorageError(message) {
   setTimeout(() => toast.remove(), 5000);
 }
 
-function loadWidgets() {
+// Apply a loaded state object to the in-memory state
+function applyLoadedState(loaded) {
+  state.widgets = (loaded.widgets || []).map(config => createWidget(config));
+  state.currentTheme = {
+    colorPrimary: loaded.colorPrimary || DEFAULT_STATE.colorPrimary,
+    colorAccent: loaded.colorAccent || DEFAULT_STATE.colorAccent,
+    themeMode: loaded.themeMode || DEFAULT_STATE.themeMode
+  };
+  state.themeMode = state.currentTheme.themeMode;
+}
+
+async function loadDashboard() {
   const stored = localStorage.getItem(STORAGE_KEY);
-  let configs = [];
+  let loaded = null;
 
   if (stored) {
     try {
       const parsed = JSON.parse(stored);
       if (parsed && typeof parsed === 'object' && 'version' in parsed) {
         if (parsed.version === STORAGE_VERSION) {
-          configs = parsed.widgets || [];
+          loaded = parsed;
         } else {
           console.warn(`Incompatible saved state version ${parsed.version}, expected ${STORAGE_VERSION}. Using defaults.`);
-          configs = [...DEFAULT_WIDGETS];
         }
-      } else {
-        configs = [...DEFAULT_WIDGETS];
       }
     } catch (e) {
-      console.error('Failed to load widgets:', e);
+      console.error('Failed to load dashboard:', e);
       showStorageError('Could not load saved dashboard. Using defaults.');
-      configs = [...DEFAULT_WIDGETS];
     }
   } else {
-    configs = [...DEFAULT_WIDGETS];
+    // No local data — try loading from sync storage (e.g. new device)
+    loaded = await loadFromSync();
   }
 
-  state.widgets = configs.map(config => createWidget(config));
+  // Migrate legacy theme from separate storage key
+  if (loaded && !('colorPrimary' in loaded)) {
+    const legacyTheme = localStorage.getItem(THEME_STORAGE_KEY);
+    if (legacyTheme) {
+      try {
+        const parsed = JSON.parse(legacyTheme);
+        if ('lightMode' in parsed && !('themeMode' in parsed)) {
+          parsed.themeMode = parsed.lightMode ? 'light' : 'dark';
+        }
+        loaded.colorPrimary = parsed.colorPrimary || DEFAULT_STATE.colorPrimary;
+        loaded.colorAccent = parsed.colorAccent || DEFAULT_STATE.colorAccent;
+        loaded.themeMode = parsed.themeMode || DEFAULT_STATE.themeMode;
+      } catch (_) { /* ignore bad legacy data */ }
+      localStorage.removeItem(THEME_STORAGE_KEY);
+    }
+  }
+
+  if (!loaded || !Array.isArray(loaded.widgets)) {
+    loaded = { ...DEFAULT_STATE, widgets: [...DEFAULT_STATE.widgets] };
+  }
+
+  applyLoadedState(loaded);
 }
 
 // Debounced save to avoid redundant writes during rapid operations
-const saveWidgets = (() => {
+const saveDashboard = (() => {
   let timeoutId = null;
 
   function doSave() {
-    const configs = state.widgets.map(w => w.toJSON());
     const payload = {
       version: STORAGE_VERSION,
-      widgets: configs
+      widgets: state.widgets.map(w => w.toJSON()),
+      colorPrimary: state.currentTheme.colorPrimary,
+      colorAccent: state.currentTheme.colorAccent,
+      themeMode: state.themeMode
     };
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
     } catch (e) {
-      console.error('Failed to save widgets:', e);
+      console.error('Failed to save dashboard:', e);
       showStorageError('Could not save your dashboard. Storage may be full or unavailable.');
     }
+    // Replicate to sync storage for cross-device sync
+    saveToSync(payload);
   }
 
   function save() {
@@ -147,7 +192,7 @@ function setupEventListeners() {
   editToggle.addEventListener('click', toggleEditMode);
 
   dashboard.addEventListener('widget-changed', () => {
-    saveWidgets();
+    saveDashboard();
   });
 
   addWidgetBtn.addEventListener('click', (e) => {
@@ -164,7 +209,7 @@ function setupEventListeners() {
     if (document.getElementById('customizeFlyout')) {
       closeAllFlyouts();
     } else {
-      showCustomizeFlyout(state);
+      showCustomizeFlyout(state, { onThemeChanged: saveDashboard });
     }
   });
 
@@ -177,16 +222,20 @@ function setupEventListeners() {
         getExportData: () => {
           return {
             version: STORAGE_VERSION,
-            widgets: state.widgets.map(w => w.toJSON())
+            widgets: state.widgets.map(w => w.toJSON()),
+            colorPrimary: state.currentTheme.colorPrimary,
+            colorAccent: state.currentTheme.colorAccent,
+            themeMode: state.themeMode
           };
         },
         importData: (data) => {
           if (!data || typeof data !== 'object' || !Array.isArray(data.widgets)) {
-            alert('Invalid layout file format.');
+            alert('Invalid dashboard file format.');
             return;
           }
-          state.widgets = data.widgets.map(config => createWidget(config));
-          saveWidgets();
+          applyLoadedState(data);
+          loadTheme(state);
+          saveDashboard();
           renderDashboard();
         }
       });
@@ -261,7 +310,7 @@ function moveWidget(id, newX, newY) {
   if (widget) {
     widget.x = newX;
     widget.y = newY;
-    saveWidgets();
+    saveDashboard();
     renderDashboard();
   }
 }
@@ -325,7 +374,7 @@ function addWidget(type) {
   const config = { id, type, x: pos.x, y: pos.y, width, height, data };
   const newWidget = createWidget(config);
   state.widgets.push(newWidget);
-  saveWidgets();
+  saveDashboard();
   renderDashboard();
 }
 
@@ -335,7 +384,7 @@ function removeWidget(id) {
     widget.destroy();
   }
   state.widgets = state.widgets.filter(w => w.id !== id);
-  saveWidgets();
+  saveDashboard();
   renderDashboard();
 }
 
@@ -344,7 +393,7 @@ function resizeWidget(id, newWidth, newHeight) {
   if (widget) {
     widget.width = newWidth;
     widget.height = newHeight;
-    saveWidgets();
+    saveDashboard();
     renderDashboard();
   }
 }
@@ -367,5 +416,5 @@ dashboardResizeObserver.observe(dashboard);
 function openWidgetConfig(id) {
   const widget = state.widgets.find(w => w.id === id);
   if (!widget) return;
-  openWidgetConfigDialog(widget, { removeWidget, saveWidgets, renderDashboard, widgets: state.widgets, openWidgetConfig });
+  openWidgetConfigDialog(widget, { removeWidget, saveDashboard, renderDashboard, widgets: state.widgets, openWidgetConfig });
 }

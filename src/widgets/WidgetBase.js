@@ -55,7 +55,7 @@ import { GRID_CELL_SIZE, GRID_GAP } from '../constants.js';
  * 
  * 5. ADD TO DEFAULT LAYOUT (Optional)
  *    - To include the widget in the default layout for new users, add an entry
- *      to DEFAULT_WIDGETS in src/defaultWidgets.js with position and size:
+ *      to DEFAULT_STATE.widgets in src/defaultState.js with position and size:
  *      { id: 'unique-id', type: 'yourwidget', x: 0, y: 0, width: 2, height: 2 }
  * 
  * ================================================================================
@@ -74,7 +74,7 @@ import { GRID_CELL_SIZE, GRID_GAP } from '../constants.js';
  *    - Delete any CSS rules for the widget from src/hellodev.css
  * 
  * 4. REMOVE FROM DEFAULT LAYOUT (if present)
- *    - Remove the widget entry from DEFAULT_WIDGETS in src/defaultWidgets.js
+ *    - Remove the widget entry from DEFAULT_STATE.widgets in src/defaultState.js
  * 
  * 5. NOTE: Existing user configurations with this widget type will gracefully
  *    fall back to WidgetBase (showing "Unknown widget")

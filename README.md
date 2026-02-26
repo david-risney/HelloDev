@@ -45,6 +45,33 @@ After installation, open a new tab to see your custom new tab page. Type in the 
 - **Search engine**: Change the URL in `hellodev.js` `handleSearch` function
 - **Features**: Add widgets or links in `hellodev.html`
 
+## Development & Testing
+
+### Validating with Chrome DevTools MCP
+
+This project includes a `.vscode/mcp.json` that configures the
+[Chrome DevTools MCP](https://github.com/anthropics/chrome-devtools-mcp) server so
+Copilot can launch a browser, install the extension, and verify it works.
+
+**Key setup notes:**
+
+- **`--executablePath`** in `.vscode/mcp.json` must point to your local Edge (or
+  Chrome) binary. Update this if your installation path differs.
+- **`--category-extensions`** is required to enable extension-management tools
+  (install, uninstall, list, reload). Without it those tools won't appear.
+
+**Validation workflow (automated by Copilot):**
+
+1. Install the extension from the `src` folder.
+2. Navigate to the extension's new tab page.
+3. Confirm zero console errors.
+4. Screenshot the page and inspect the DOM for expected elements (greeting, clock,
+   toolbar buttons, widget controls).
+5. Verify the extension appears enabled with no manifest warnings.
+
+See [`.github/copilot-instructions.md`](.github/copilot-instructions.md) for the
+full checklist Copilot follows automatically.
+
 ## Icons
 
 The `icons/` folder requires PNG icons at these sizes:

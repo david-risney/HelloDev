@@ -101,7 +101,7 @@ function renderWidgetConfigFields(widget) {
 }
 
 // Collect form values and save them back to the widget
-function saveWidgetConfig(widget, dialog, { saveWidgets, closeWidgetConfig, renderDashboard }) {
+function saveWidgetConfig(widget, dialog, { saveDashboard, closeWidgetConfig, renderDashboard }) {
   // Save position, size, z-index, and stretch fill
   widget.x = parseInt(dialog.querySelector('input[name="x"]').value) || 0;
   widget.y = parseInt(dialog.querySelector('input[name="y"]').value) || 0;
@@ -146,7 +146,7 @@ function saveWidgetConfig(widget, dialog, { saveWidgets, closeWidgetConfig, rend
   // Use setConfig to apply values (allows widgets to override and react to changes)
   widget.setConfig(configValues);
 
-  saveWidgets();
+  saveDashboard();
   closeWidgetConfig();
   renderDashboard();
 }
@@ -160,7 +160,7 @@ export function closeWidgetConfig() {
 }
 
 // Open the widget configuration dialog.
-// callbacks: { removeWidget, saveWidgets, renderDashboard }
+// callbacks: { removeWidget, saveDashboard, renderDashboard }
 export function openWidgetConfig(widget, callbacks) {
   // Remove existing dialog if any
   closeWidgetConfig();
@@ -252,7 +252,7 @@ export function openWidgetConfig(widget, callbacks) {
   // Save button
   dialog.querySelector('.widget-config-btn.save').addEventListener('click', () => {
     saveWidgetConfig(widget, dialog, {
-      saveWidgets: callbacks.saveWidgets,
+      saveDashboard: callbacks.saveDashboard,
       closeWidgetConfig,
       renderDashboard: callbacks.renderDashboard
     });
@@ -272,7 +272,7 @@ export function openWidgetConfig(widget, callbacks) {
 
       // Save current widget before navigating
       saveWidgetConfig(widget, dialog, {
-        saveWidgets: callbacks.saveWidgets,
+        saveDashboard: callbacks.saveDashboard,
         closeWidgetConfig,
         renderDashboard: callbacks.renderDashboard
       });

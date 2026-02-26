@@ -1,6 +1,8 @@
 // Shared constants for HelloDev dashboard
 
 export const STORAGE_KEY = 'hellodev-widgets';
+
+// Legacy key for theme-only storage (pre-unified format). Used during migration only.
 export const THEME_STORAGE_KEY = 'hellodev-theme';
 
 // Version number for saved widget state. Increment this when the saved state format

@@ -5,7 +5,8 @@
   "description": "A simple custom new tab page extension",
   "permissions": [
     "nativeMessaging",
-    "identity"
+    "identity",
+    "storage"
   ],
   "host_permissions": [
     "https://login.microsoftonline.com/*",

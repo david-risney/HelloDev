@@ -1,12 +1,24 @@
-// HelloDev Dashboard - Default widget layout for new users
+// HelloDev Dashboard - Default state for new users
+
+import { STORAGE_VERSION } from './constants.js';
 
 /**
- * Default widget configurations shown when a user first loads the dashboard
+ * Default dashboard state shown when a user first loads the dashboard
  * or when saved state is incompatible/corrupt.
  *
- * Each entry should specify: id, type, x, y, width, height, and optionally data.
+ * This is the canonical shape used everywhere: localStorage, chrome.storage.sync,
+ * file export/import, and the DEFAULT_STATE constant itself.
+ *
+ * Shape:
+ *   version      - state format version (must match STORAGE_VERSION)
+ *   widgets      - array of widget configs (id, type, x, y, width, height, ...)
+ *   colorPrimary - CSS color for the primary/background theme color
+ *   colorAccent  - CSS color for the accent/highlight color
+ *   themeMode    - 'auto' | 'light' | 'dark'
  */
-export const DEFAULT_WIDGETS = [
+export const DEFAULT_STATE = {
+  version: STORAGE_VERSION,
+  widgets: [
   {
     id: 'widget-default-1',
     type: 'fluid',
@@ -56,4 +68,8 @@ Your personal developer dashboard is ready to customize.
       viewMode: 'rendered'
     }
   }
-];
+  ],
+  colorPrimary: '#1a1a2e',
+  colorAccent: '#667eea',
+  themeMode: 'auto'
+};
