@@ -13,35 +13,11 @@ import {
   showAboutFlyout,
   showDataFlyout
 } from './flyouts.js';
+import { DEFAULT_WIDGETS } from './defaultWidgets.js';
 
 // ============================================================================
-// Default Layout & State
+// Dashboard State
 // ============================================================================
-
-const DEFAULT_WIDGETS = [
-  { id: 'widget-1', type: 'clock', x: 0, y: 0, width: 3, height: 2 },
-  {
-    id: 'widget-2',
-    type: 'markdown',
-    x: 4,
-    y: 1,
-    width: 5,
-    height: 4,
-    data: {
-      markdown: `# Welcome to HelloDev! \ud83d\udc4b
-
-Your personal developer dashboard is ready to customize.
-
-## Getting Started
-
-- [ ] **Click the \u2630 menu** in the top-right to enter edit mode
-- [ ] **Add widgets** from the panel that appears
-- [ ] **Drag and resize widgets** to arrange your layout
-- [ ] **Configure widgets** by clicking \u2699 on each one
-- [ ] *Delete this widget when you're ready!*`
-    }
-  }
-];
 
 // Centralized dashboard state
 const state = {
@@ -197,7 +173,23 @@ function setupEventListeners() {
     if (document.getElementById('dataFlyout')) {
       closeAllFlyouts();
     } else {
-      showDataFlyout();
+      showDataFlyout({
+        getExportData: () => {
+          return {
+            version: STORAGE_VERSION,
+            widgets: state.widgets.map(w => w.toJSON())
+          };
+        },
+        importData: (data) => {
+          if (!data || typeof data !== 'object' || !Array.isArray(data.widgets)) {
+            alert('Invalid layout file format.');
+            return;
+          }
+          state.widgets = data.widgets.map(config => createWidget(config));
+          saveWidgets();
+          renderDashboard();
+        }
+      });
     }
   });
 

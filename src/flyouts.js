@@ -248,7 +248,7 @@ export async function showAboutFlyout() {
 }
 
 // Show Data Management flyout
-export function showDataFlyout() {
+export function showDataFlyout({ getExportData, importData } = {}) {
   createFlyout({
     id: 'dataFlyout',
     parentEl: buttonEls.dataBtn,
@@ -256,6 +256,18 @@ export function showDataFlyout() {
     dialogClass: 'data-dialog',
     contentHtml: `
       <div class="data-section">
+        <div class="data-io-buttons">
+          <button class="data-io-btn" id="exportDataBtn">
+            <span>\ud83d\udce4</span>
+            <span>Export Layout</span>
+          </button>
+          <button class="data-io-btn" id="importDataBtn">
+            <span>\ud83d\udce5</span>
+            <span>Import Layout</span>
+          </button>
+          <input type="file" id="importFileInput" accept=".json" class="hidden">
+        </div>
+        <hr class="data-divider">
         <p class="data-description">Clear all HelloDev data including widgets, settings, and preferences. This action cannot be undone.</p>
         <button class="data-clear-btn" id="clearDataBtn">
           <span>\ud83d\uddd1</span>
@@ -271,6 +283,44 @@ export function showDataFlyout() {
       </div>
     `,
     onSetup(flyout) {
+      // Export layout
+      flyout.querySelector('#exportDataBtn').addEventListener('click', () => {
+        if (!getExportData) return;
+        const data = getExportData();
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `hellodev-layout-${new Date().toISOString().slice(0, 10)}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+      });
+
+      // Import layout
+      const fileInput = flyout.querySelector('#importFileInput');
+      flyout.querySelector('#importDataBtn').addEventListener('click', () => {
+        fileInput.click();
+      });
+      fileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+          try {
+            const data = JSON.parse(reader.result);
+            if (importData) {
+              importData(data);
+              closeAllFlyouts();
+            }
+          } catch (err) {
+            console.error('Failed to import layout:', err);
+            alert('Invalid layout file. Please select a valid HelloDev JSON export.');
+          }
+        };
+        reader.readAsText(file);
+      });
+
+      // Clear all data
       const clearBtn = flyout.querySelector('#clearDataBtn');
       const confirmSection = flyout.querySelector('#dataConfirm');
       const cancelBtn = flyout.querySelector('#dataCancelBtn');
