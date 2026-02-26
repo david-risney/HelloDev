@@ -5,3 +5,12 @@ native-host/ado_token_host.bat
 
 # OAuth credentials (contains client secrets)
 src/secrets.js
+
+# Dependencies
+node_modules/
+
+# Test outputs
+coverage/
+playwright-report/
+test-results/
+tests/e2e/screenshots/
