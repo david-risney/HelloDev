@@ -37,48 +37,6 @@ function findAzCli() {
     }
   }
 
-  // Common installation paths
-  const possiblePaths = isWindows ? [
-    // Default Azure CLI installation
-    'C:\\Program Files (x86)\\Microsoft SDKs\\Azure\\CLI2\\wbin\\az.bat',
-    'C:\\Program Files\\Microsoft SDKs\\Azure\\CLI2\\wbin\\az.bat',
-    'C:\\Program Files (x86)\\Microsoft SDKs\\Azure\\CLI2\\wbin\\az.cmd',
-    'C:\\Program Files\\Microsoft SDKs\\Azure\\CLI2\\wbin\\az.cmd',
-    // Winget/scoop installations
-    path.join(os.homedir(), 'AppData\\Local\\Programs\\Azure CLI\\wbin\\az.bat'),
-    path.join(os.homedir(), 'AppData\\Local\\Programs\\Azure CLI\\wbin\\az.cmd'),
-    path.join(os.homedir(), 'scoop\\shims\\az.cmd'),
-    // Python pip installation
-    path.join(os.homedir(), 'AppData\\Local\\Programs\\Python\\Python39\\Scripts\\az.cmd'),
-    path.join(os.homedir(), 'AppData\\Local\\Programs\\Python\\Python310\\Scripts\\az.cmd'),
-    path.join(os.homedir(), 'AppData\\Local\\Programs\\Python\\Python311\\Scripts\\az.cmd'),
-    path.join(os.homedir(), 'AppData\\Local\\Programs\\Python\\Python312\\Scripts\\az.cmd'),
-  ] : [
-    // macOS Homebrew
-    '/usr/local/bin/az',
-    '/opt/homebrew/bin/az',
-    // Linux
-    '/usr/bin/az',
-    '/usr/local/bin/az',
-    path.join(os.homedir(), '.local/bin/az'),
-  ];
-
-  for (const azPath of possiblePaths) {
-    if (fs.existsSync(azPath)) {
-      try {
-        execSync(`"${azPath}" --version`, {
-          encoding: 'utf8',
-          timeout: 5000,
-          stdio: ['pipe', 'pipe', 'pipe'],
-          shell: true
-        });
-        return azPath;
-      } catch (e) {
-        // This az.cmd exists but doesn't work (e.g. broken Python reference), skip it
-      }
-    }
-  }
-
   return null;
 }
 
