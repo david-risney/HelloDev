@@ -8,6 +8,7 @@ export class MarkdownWidget extends WidgetBase {
   static metadata = {
     name: 'Markdown',
     icon: '📄',
+    group: 'Utility',
     defaultSize: { width: 4, height: 3 }
   };
 

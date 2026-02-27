@@ -209,19 +209,35 @@ body {
   overflow-y: auto;
 }
 
-/* Widget options grid in flyout */
+/* Widget options list in flyout */
+.widget-group + .widget-group {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.widget-group-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(255, 255, 255, 0.5);
+  padding: 0.25rem 0.75rem;
+}
+
 .widget-options-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
 }
 
 .widget-options-grid .widget-option {
   display: flex;
   align-items: center;
-  padding: 0.75rem;
+  padding: 0.5rem 0.75rem;
   text-align: left;
   gap: 0.5rem;
+  width: 100%;
 }
 
 /* Appearance flyout */
@@ -1498,7 +1514,9 @@ body {
    ========================================================================== */
 
 .widget-adopr .widget-content,
-.widget-adobugs .widget-content {
+.widget-adobugs .widget-content,
+.widget-githubpr .widget-content,
+.widget-githubissues .widget-content {
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -2028,6 +2046,90 @@ body.light-mode .ado-widget-item:hover {
 
 .ado-widget-item.state-closed .widget-adobugs-item-state {
   color: var(--text-secondary);
+}
+
+/* ==========================================================================
+   GitHub Issues Widget
+   ========================================================================== */
+
+.github-issues-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.github-issues-line1 {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.github-issues-number {
+  font-size: 0.75rem;
+  color: var(--accent);
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.github-issues-title {
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.github-issues-state-icon {
+  font-size: 0.75rem;
+  flex-shrink: 0;
+}
+
+.github-issues-line2 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+}
+
+.github-issues-author {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.github-issues-age {
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.github-issues-comments {
+  flex-shrink: 0;
+  font-size: 0.65rem;
+}
+
+.github-issues-label {
+  display: inline-block;
+  font-size: 0.6rem;
+  padding: 0.1em 0.4em;
+  border-radius: 3px;
+  color: #fff;
+  max-width: 6rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.github-issues-state-closed .github-issues-number {
+  color: #a371f7;
+}
+
+.github-issues-state-not-planned .github-issues-number {
+  color: #8b949e;
 }
 
 /* ==========================================================================

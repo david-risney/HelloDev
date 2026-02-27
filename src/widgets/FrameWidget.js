@@ -7,6 +7,7 @@ export class FrameWidget extends WidgetBase {
   static metadata = {
     name: 'Frame',
     icon: '🌐',
+    group: 'Utility',
     defaultSize: { width: 4, height: 4 }
   };
 

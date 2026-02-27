@@ -80,21 +80,39 @@ function createFlyout({ id, parentEl, title, dialogClass, contentHtml, onSetup }
 
 // Show Add Widget flyout
 export function showAddWidgetFlyout(addWidget) {
-  let widgetButtons = '';
+  // Group widgets by their metadata group
+  const groups = {};
   for (const [type, WidgetClass] of Object.entries(WidgetRegistry)) {
-    const { name, icon } = WidgetClass.metadata;
-    widgetButtons += `<button class="widget-option" data-widget="${type}">${icon} ${name}</button>`;
+    const { name, icon, group } = WidgetClass.metadata;
+    const groupName = group || 'Utility';
+    if (!groups[groupName]) groups[groupName] = [];
+    groups[groupName].push({ type, name, icon });
+  }
+
+  // Render groups in a defined order
+  const groupOrder = ['ADO', 'Chromium', 'GitHub', 'Utility'];
+  let contentHtml = '';
+  for (const groupName of groupOrder) {
+    const widgets = groups[groupName];
+    if (!widgets) continue;
+    let buttons = '';
+    for (const { type, name, icon } of widgets) {
+      buttons += `<button class="widget-option" data-widget="${type}">${icon} ${name}</button>`;
+    }
+    contentHtml += `
+      <div class="widget-group">
+        <div class="widget-group-label">${groupName}</div>
+        <div class="widget-options-grid">
+          ${buttons}
+        </div>
+      </div>`;
   }
 
   createFlyout({
     id: 'addWidgetFlyout',
     parentEl: buttonEls.addWidgetBtn,
     title: 'Add Widget',
-    contentHtml: `
-      <div class="widget-options-grid">
-        ${widgetButtons}
-      </div>
-    `,
+    contentHtml,
     onSetup(flyout) {
       flyout.querySelectorAll('.widget-option').forEach(btn => {
         btn.addEventListener('click', () => {

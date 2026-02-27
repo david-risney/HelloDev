@@ -15,12 +15,12 @@ $AdoHostName = "com.hellodev.ado"
 $GitHubHostName = "com.hellodev.github"
 
 # ADO paths
-$AdoHostScriptPath = Join-Path $ScriptDir "ado_token_host.js"
+$AdoHostScriptPath = Join-Path $ScriptDir "ado_token_host.cjs"
 $AdoManifestPath = Join-Path $ScriptDir "$AdoHostName.json"
 $AdoWrapperPath = Join-Path $ScriptDir "ado_token_host.bat"
 
 # GitHub paths
-$GitHubHostScriptPath = Join-Path $ScriptDir "gh_token_host.js"
+$GitHubHostScriptPath = Join-Path $ScriptDir "gh_token_host.cjs"
 $GitHubManifestPath = Join-Path $ScriptDir "$GitHubHostName.json"
 $GitHubWrapperPath = Join-Path $ScriptDir "gh_token_host.bat"
 

@@ -8,6 +8,7 @@ export class ADOPRWidget extends ADOWidgetBase {
   static metadata = {
     name: 'ADO PRs',
     icon: '🔀',
+    group: 'ADO',
     defaultSize: { width: 4, height: 4 }
   };
 

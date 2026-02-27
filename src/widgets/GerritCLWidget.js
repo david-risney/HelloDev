@@ -15,8 +15,9 @@ import { TimeFormatter } from '../TimeFormatter.js';
  */
 export class GerritCLWidget extends DataWidgetBase {
   static metadata = {
-    name: 'Gerrit CLs',
-    icon: '🔍',
+    name: 'Chromium CLs',
+    icon: '🔀',
+    group: 'Chromium',
     defaultSize: { width: 4, height: 4 }
   };
 
@@ -45,7 +46,7 @@ export class GerritCLWidget extends DataWidgetBase {
   }
 
   getCachePrefix() { return 'gerritcl'; }
-  getDefaultTitle() { return 'Gerrit CLs'; }
+  getDefaultTitle() { return 'Chromium CLs'; }
   getEmptyMessage() { return 'No CLs found'; }
   getConfigureMessage() { return 'Configure a Gerrit host and query to see CLs'; }
 

@@ -7,6 +7,7 @@ export class ClockWidget extends WidgetBase {
   static metadata = {
     name: 'Clock',
     icon: '🕐',
+    group: 'Utility',
     defaultSize: { width: 3, height: 2 },
     defaultZIndex: 1
   };

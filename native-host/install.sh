@@ -18,8 +18,8 @@ ADO_HOST_NAME="com.hellodev.ado"
 GITHUB_HOST_NAME="com.hellodev.github"
 
 # Paths to the native host scripts
-ADO_HOST_PATH="$SCRIPT_DIR/ado_token_host.js"
-GITHUB_HOST_PATH="$SCRIPT_DIR/gh_token_host.js"
+ADO_HOST_PATH="$SCRIPT_DIR/ado_token_host.cjs"
+GITHUB_HOST_PATH="$SCRIPT_DIR/gh_token_host.cjs"
 
 # Extension ID - update this after loading the extension
 EXTENSION_ID="${1:-nhfaibfkboppjdaiiaocmdkahcmglgbh}"

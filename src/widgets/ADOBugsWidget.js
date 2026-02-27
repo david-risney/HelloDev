@@ -10,6 +10,7 @@ export class ADOBugsWidget extends ADOWidgetBase {
   static metadata = {
     name: 'ADO Bugs',
     icon: '🐛',
+    group: 'ADO',
     defaultSize: { width: 4, height: 4 }
   };
 

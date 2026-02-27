@@ -3,27 +3,27 @@ import { GitHubAuthHelper } from '../GitHubAuthHelper.js';
 import { TimeFormatter } from '../TimeFormatter.js';
 
 /**
- * GitHub Pull Request Widget
+ * GitHub Issues Widget
  *
- * Displays pull requests from a GitHub repository using the GitHub REST API.
+ * Displays issues from a GitHub repository using the GitHub REST API.
  * Supports three auth modes:
  *   - 'none'  — unauthenticated (public repos only, 60 req/hr)
  *   - 'pat'   — Personal Access Token entered in widget config
  *   - 'ghcli' — Token acquired automatically via gh CLI native messaging
  *
- * API endpoint: GET /repos/{owner}/{repo}/pulls
- * Docs: https://docs.github.com/en/rest/pulls/pulls#list-pull-requests
+ * API endpoint: GET /repos/{owner}/{repo}/issues
+ * Docs: https://docs.github.com/en/rest/issues/issues#list-repository-issues
  */
-export class GitHubPRWidget extends DataWidgetBase {
+export class GitHubIssuesWidget extends DataWidgetBase {
   static metadata = {
-    name: 'GitHub PRs',
-    icon: '\u{1F500}',
+    name: 'GitHub Issues',
+    icon: '🐛',
     group: 'GitHub',
     defaultSize: { width: 4, height: 4 }
   };
 
   constructor(config) {
-    super({ ...config, type: 'githubpr' });
+    super({ ...config, type: 'githubissues' });
 
     // Defaults
     this.data.owner ??= '';
@@ -31,9 +31,10 @@ export class GitHubPRWidget extends DataWidgetBase {
     this.data.authMode ??= 'none';
     this.data.token ??= '';
     this.data.state ??= 'open';
-    this.data.baseBranch ??= '';
     this.data.author ??= '';
     this.data.labels ??= '';
+    this.data.assignee ??= '';
+    this.data.milestone ??= '';
     this.data.maxCount ??= 25;
     this.data.refreshInterval ??= 60;
     this.data.title ??= '';
@@ -50,10 +51,10 @@ export class GitHubPRWidget extends DataWidgetBase {
     return !!(this.data.owner && this.data.repo);
   }
 
-  getCachePrefix() { return 'githubpr'; }
-  getDefaultTitle() { return 'GitHub PRs'; }
-  getEmptyMessage() { return 'No pull requests found'; }
-  getConfigureMessage() { return 'Configure owner and repository to see PRs'; }
+  getCachePrefix() { return 'githubissues'; }
+  getDefaultTitle() { return 'GitHub Issues'; }
+  getEmptyMessage() { return 'No issues found'; }
+  getConfigureMessage() { return 'Configure owner and repository to see issues'; }
 
   getItemDateField(item) {
     return item.updated_at || item.created_at;
@@ -63,7 +64,7 @@ export class GitHubPRWidget extends DataWidgetBase {
     if (!this.data.owner || !this.data.repo) return null;
     const owner = encodeURIComponent(this.data.owner);
     const repo = encodeURIComponent(this.data.repo);
-    return `https://github.com/${owner}/${repo}/pulls`;
+    return `https://github.com/${owner}/${repo}/issues`;
   }
 
   onContentUpdated(contentEl) {
@@ -95,7 +96,7 @@ export class GitHubPRWidget extends DataWidgetBase {
       },
       { key: 'token', label: 'Personal Access Token (for PAT mode)', type: 'string', default: '' },
       {
-        key: 'state', label: 'PR State', type: 'select',
+        key: 'state', label: 'Issue State', type: 'select',
         options: [
           { value: 'open', label: 'Open' },
           { value: 'closed', label: 'Closed' },
@@ -103,9 +104,10 @@ export class GitHubPRWidget extends DataWidgetBase {
         ],
         default: 'open'
       },
-      { key: 'baseBranch', label: 'Base Branch (optional)', type: 'string', default: '' },
       { key: 'author', label: 'Author (optional)', type: 'string', default: '' },
       { key: 'labels', label: 'Labels (comma-separated, optional)', type: 'string', default: '' },
+      { key: 'assignee', label: 'Assignee (optional)', type: 'string', default: '' },
+      { key: 'milestone', label: 'Milestone (number or *, optional)', type: 'string', default: '' },
       { key: 'maxCount', label: 'Max Results', type: 'number', default: 25 },
       { key: 'refreshInterval', label: 'Auto-Refresh (minutes, 0 = off)', type: 'number', default: 60 },
       { key: 'maxAgeDays', label: 'Max Age (days, 0 = no limit)', type: 'number', default: 0 }
@@ -131,7 +133,7 @@ export class GitHubPRWidget extends DataWidgetBase {
     this.loading = true;
     this.loadingStatus = this.data.authMode === 'ghcli'
       ? 'Obtaining GitHub token...'
-      : 'Fetching pull requests...';
+      : 'Fetching issues...';
     this.error = null;
     this.updateContent();
 
@@ -139,13 +141,13 @@ export class GitHubPRWidget extends DataWidgetBase {
       let token = null;
       if (this.data.authMode === 'ghcli') {
         token = await GitHubAuthHelper.getToken();
-        this.loadingStatus = 'Fetching pull requests...';
+        this.loadingStatus = 'Fetching issues...';
         this.updateContent();
       } else if (this.data.authMode === 'pat' && this.data.token) {
         token = this.data.token;
       }
 
-      this.items = await this.fetchPullRequests(token);
+      this.items = await this.fetchIssues(token);
       this.lastFetched = Date.now();
       this.lastServerFetch = this.lastFetched;
       this.saveToCache();
@@ -163,7 +165,7 @@ export class GitHubPRWidget extends DataWidgetBase {
   // GitHub REST API
   // ---------------------------------------------------------------------------
 
-  async fetchPullRequests(accessToken) {
+  async fetchIssues(accessToken) {
     const owner = encodeURIComponent(this.data.owner);
     const repo = encodeURIComponent(this.data.repo);
     const params = new URLSearchParams({
@@ -173,11 +175,17 @@ export class GitHubPRWidget extends DataWidgetBase {
       direction: 'desc'
     });
 
-    if (this.data.baseBranch) {
-      params.set('base', this.data.baseBranch);
+    if (this.data.labels) {
+      params.set('labels', this.data.labels);
+    }
+    if (this.data.assignee) {
+      params.set('assignee', this.data.assignee);
+    }
+    if (this.data.milestone) {
+      params.set('milestone', this.data.milestone);
     }
 
-    const url = `https://api.github.com/repos/${owner}/${repo}/pulls?${params}`;
+    const url = `https://api.github.com/repos/${owner}/${repo}/issues?${params}`;
 
     const headers = {
       'Accept': 'application/vnd.github+json',
@@ -229,51 +237,42 @@ export class GitHubPRWidget extends DataWidgetBase {
 
     let items = await response.json();
 
-    // Client-side author filter (GitHub API doesn't support this param directly)
+    // The issues endpoint also returns pull requests; filter them out
+    items = items.filter(item => !item.pull_request);
+
+    // Client-side author filter (GitHub API doesn't support creator param on this endpoint consistently)
     if (this.data.author) {
       const author = this.data.author.toLowerCase();
-      items = items.filter(pr => pr.user?.login?.toLowerCase() === author);
-    }
-
-    // Client-side label filter
-    if (this.data.labels) {
-      const filterLabels = this.data.labels.split(',').map(l => l.trim().toLowerCase()).filter(Boolean);
-      if (filterLabels.length > 0) {
-        items = items.filter(pr => {
-          const prLabels = (pr.labels || []).map(l => l.name.toLowerCase());
-          return filterLabels.every(fl => prLabels.includes(fl));
-        });
-      }
+      items = items.filter(issue => issue.user?.login?.toLowerCase() === author);
     }
 
     return items;
   }
 
   // ---------------------------------------------------------------------------
-  // Render a single PR item
+  // Render a single issue item
   // ---------------------------------------------------------------------------
 
-  renderItem(pr) {
-    const title = this.escapeHtml(pr.title || '(no title)');
-    const author = this.escapeHtml(pr.user?.login || 'Unknown');
-    const initials = this.getInitials(pr.user?.login || '?');
-    const avatarUrl = pr.user?.avatar_url;
-    const age = TimeFormatter.formatRelative(pr.updated_at || pr.created_at);
-    const url = pr.html_url || '#';
-    const number = pr.number;
-    const isDraft = pr.draft;
+  renderItem(issue) {
+    const title = this.escapeHtml(issue.title || '(no title)');
+    const author = this.escapeHtml(issue.user?.login || 'Unknown');
+    const initials = this.getInitials(issue.user?.login || '?');
+    const avatarUrl = issue.user?.avatar_url;
+    const age = TimeFormatter.formatRelative(issue.updated_at || issue.created_at);
+    const url = issue.html_url || '#';
+    const number = issue.number;
 
-    const reviewStatus = this.getReviewStatusIcon(pr);
-    const stateClass = this.getStateClass(pr);
-    const draftBadge = isDraft
-      ? '<span class="github-pr-draft" title="Draft">Draft</span>'
-      : '';
-
-    const labelHtml = this.renderLabels(pr.labels);
+    const stateClass = this.getStateClass(issue);
+    const stateIcon = this.getStateIcon(issue);
+    const labelHtml = this.renderLabels(issue.labels);
 
     const avatarHtml = avatarUrl
       ? `<img class="ado-widget-avatar" src="${this.escapeHtml(avatarUrl)}" alt="${author}"><span class="ado-widget-avatar-initials" style="display:none">${initials}</span>`
       : `<span class="ado-widget-avatar-initials">${initials}</span>`;
+
+    const commentHtml = issue.comments > 0
+      ? `<span class="github-issues-comments" title="${issue.comments} comment${issue.comments !== 1 ? 's' : ''}">💬 ${issue.comments}</span>`
+      : '';
 
     return `
       <li class="ado-widget-item ${stateClass}">
@@ -281,17 +280,17 @@ export class GitHubPRWidget extends DataWidgetBase {
           <div class="ado-widget-avatar-container">
             ${avatarHtml}
           </div>
-          <div class="github-pr-content">
-            <div class="github-pr-line1">
-              <span class="github-pr-title">${title}</span>
-              ${draftBadge}
-              <span class="github-pr-review">${reviewStatus}</span>
+          <div class="github-issues-content">
+            <div class="github-issues-line1">
+              <span class="github-issues-title">${title}</span>
+              <span class="github-issues-state-icon">${stateIcon}</span>
             </div>
-            <div class="github-pr-line2">
-              <span class="github-pr-number">#${number}</span>
-              <span class="github-pr-author">${author}</span>
+            <div class="github-issues-line2">
+              <span class="github-issues-number">#${number}</span>
+              <span class="github-issues-author">${author}</span>
               ${labelHtml}
-              <span class="github-pr-age">${age}</span>
+              ${commentHtml}
+              <span class="github-issues-age">${age}</span>
             </div>
           </div>
         </a>
@@ -306,27 +305,25 @@ export class GitHubPRWidget extends DataWidgetBase {
     return shown.map(label => {
       const name = this.escapeHtml(label.name);
       const color = label.color ? `#${label.color}` : 'var(--accent)';
-      return `<span class="github-pr-label" style="background:${color}" title="${name}">${name}</span>`;
+      return `<span class="github-issues-label" style="background:${color}" title="${name}">${name}</span>`;
     }).join('');
   }
 
-  getStateClass(pr) {
-    if (pr.draft) return 'github-pr-state-draft';
-    if (pr.state === 'closed') {
-      return pr.merged_at ? 'github-pr-state-merged' : 'github-pr-state-closed';
+  getStateClass(issue) {
+    if (issue.state === 'closed') {
+      return issue.state_reason === 'not_planned'
+        ? 'github-issues-state-not-planned'
+        : 'github-issues-state-closed';
     }
-    return 'github-pr-state-open';
+    return 'github-issues-state-open';
   }
 
-  getReviewStatusIcon(pr) {
-    // The list PRs endpoint doesn't include detailed review data, but we can
-    // infer from the requested_reviewers field.
-    if (pr.requested_reviewers && pr.requested_reviewers.length > 0) {
-      return `<span title="Review requested">⏳</span>`;
+  getStateIcon(issue) {
+    if (issue.state === 'closed') {
+      return issue.state_reason === 'not_planned'
+        ? '<span title="Closed as not planned">⊘</span>'
+        : '<span title="Closed as completed">✔</span>';
     }
-    if (pr.draft) {
-      return `<span title="Draft">📝</span>`;
-    }
-    return `<span title="Open">👁</span>`;
+    return '<span title="Open">○</span>';
   }
 }

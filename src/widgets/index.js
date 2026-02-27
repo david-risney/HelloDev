@@ -9,6 +9,7 @@ export { GerritCLWidget } from './GerritCLWidget.js';
 export { FluidWidget } from './FluidWidget.js';
 export { ChromiumBugsWidget } from './ChromiumBugsWidget.js';
 export { GitHubPRWidget } from './GitHubPRWidget.js';
+export { GitHubIssuesWidget } from './GitHubIssuesWidget.js';
 
 import { WidgetBase } from './WidgetBase.js';
 import { ClockWidget } from './ClockWidget.js';
@@ -21,6 +22,7 @@ import { GerritCLWidget } from './GerritCLWidget.js';
 import { FluidWidget } from './FluidWidget.js';
 import { ChromiumBugsWidget } from './ChromiumBugsWidget.js';
 import { GitHubPRWidget } from './GitHubPRWidget.js';
+import { GitHubIssuesWidget } from './GitHubIssuesWidget.js';
 
 // Widget factory - creates the appropriate widget class instance
 export const WidgetRegistry = {
@@ -33,7 +35,8 @@ export const WidgetRegistry = {
   gerritcl: GerritCLWidget,
   fluid: FluidWidget,
   chromiumbug: ChromiumBugsWidget,
-  githubpr: GitHubPRWidget
+  githubpr: GitHubPRWidget,
+  githubissues: GitHubIssuesWidget
 };
 
 export function createWidget(config) {

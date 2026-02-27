@@ -9,6 +9,7 @@ export class FluidWidget extends WidgetBase {
   static metadata = {
     name: 'Fluid',
     icon: '🌊',
+    group: 'Utility',
     defaultSize: { width: 3, height: 3 },
     defaultZIndex: 0
   };

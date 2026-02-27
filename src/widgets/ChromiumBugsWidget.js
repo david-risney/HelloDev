@@ -10,7 +10,8 @@ import { TimeFormatter } from '../TimeFormatter.js';
 export class ChromiumBugsWidget extends DataWidgetBase {
   static metadata = {
     name: 'Chromium Bugs',
-    icon: '🐞',
+    icon: '\u{1F41B}',
+    group: 'Chromium',
     defaultSize: { width: 4, height: 4 }
   };
 

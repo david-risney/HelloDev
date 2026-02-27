@@ -7,6 +7,7 @@ export class SearchWidget extends WidgetBase {
   static metadata = {
     name: 'Search',
     icon: '🔍',
+    group: 'Utility',
     defaultSize: { width: 4, height: 1 }
   };
 
