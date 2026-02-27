@@ -10,13 +10,19 @@ $ErrorActionPreference = "Stop"
 # Get the directory where this script is located
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 
-# Native host name
-$HostName = "com.hellodev.ado"
+# Native host names
+$AdoHostName = "com.hellodev.ado"
+$GitHubHostName = "com.hellodev.github"
 
-# Paths
-$HostScriptPath = Join-Path $ScriptDir "ado_token_host.js"
-$ManifestPath = Join-Path $ScriptDir "$HostName.json"
-$WrapperPath = Join-Path $ScriptDir "ado_token_host.bat"
+# ADO paths
+$AdoHostScriptPath = Join-Path $ScriptDir "ado_token_host.js"
+$AdoManifestPath = Join-Path $ScriptDir "$AdoHostName.json"
+$AdoWrapperPath = Join-Path $ScriptDir "ado_token_host.bat"
+
+# GitHub paths
+$GitHubHostScriptPath = Join-Path $ScriptDir "gh_token_host.js"
+$GitHubManifestPath = Join-Path $ScriptDir "$GitHubHostName.json"
+$GitHubWrapperPath = Join-Path $ScriptDir "gh_token_host.bat"
 
 Write-Host "HelloDev Native Host Installer" -ForegroundColor Cyan
 Write-Host "==============================" -ForegroundColor Cyan
@@ -110,42 +116,69 @@ if (-not $azVersion) {
     Write-Host "Azure CLI is installed: $azVersion" -ForegroundColor Green
 }
 
-# Create the batch wrapper for Node.js (Chrome needs an executable)
+# Create the batch wrappers for Node.js (Chrome needs an executable)
 Write-Host ""
-Write-Host "Creating native host wrapper..." -ForegroundColor Yellow
-$wrapperContent = "@echo off`r`nnode `"$HostScriptPath`" %*"
-Set-Content -Path $WrapperPath -Value $wrapperContent -Encoding ASCII
-Write-Host "Created: $WrapperPath" -ForegroundColor Green
+Write-Host "Creating native host wrappers..." -ForegroundColor Yellow
 
-# Create the native messaging manifest
+$adoWrapperContent = "@echo off`r`nnode `"$AdoHostScriptPath`" %*"
+Set-Content -Path $AdoWrapperPath -Value $adoWrapperContent -Encoding ASCII
+Write-Host "Created: $AdoWrapperPath" -ForegroundColor Green
+
+$ghWrapperContent = "@echo off`r`nnode `"$GitHubHostScriptPath`" %*"
+Set-Content -Path $GitHubWrapperPath -Value $ghWrapperContent -Encoding ASCII
+Write-Host "Created: $GitHubWrapperPath" -ForegroundColor Green
+
+# Create the native messaging manifests
 Write-Host ""
-Write-Host "Creating native messaging manifest..." -ForegroundColor Yellow
-$manifest = @{
-    name = $HostName
+Write-Host "Creating native messaging manifests..." -ForegroundColor Yellow
+
+$adoManifest = @{
+    name = $AdoHostName
     description = "HelloDev Native Host for Azure DevOps tokens"
-    path = $WrapperPath
+    path = $AdoWrapperPath
     type = "stdio"
     allowed_origins = @("chrome-extension://$ExtensionId/")
 } | ConvertTo-Json -Depth 10
+Set-Content -Path $AdoManifestPath -Value $adoManifest -Encoding UTF8
+Write-Host "Created: $AdoManifestPath" -ForegroundColor Green
 
-Set-Content -Path $ManifestPath -Value $manifest -Encoding UTF8
-Write-Host "Created: $ManifestPath" -ForegroundColor Green
+$ghManifest = @{
+    name = $GitHubHostName
+    description = "HelloDev Native Host for GitHub tokens via gh cli"
+    path = $GitHubWrapperPath
+    type = "stdio"
+    allowed_origins = @("chrome-extension://$ExtensionId/")
+} | ConvertTo-Json -Depth 10
+Set-Content -Path $GitHubManifestPath -Value $ghManifest -Encoding UTF8
+Write-Host "Created: $GitHubManifestPath" -ForegroundColor Green
 
 # Add registry entries
 Write-Host ""
 Write-Host "Adding registry entries..." -ForegroundColor Yellow
 
-# Chrome
-$chromeRegPath = "HKCU:\Software\Google\Chrome\NativeMessagingHosts\$HostName"
-New-Item -Path $chromeRegPath -Force | Out-Null
-Set-ItemProperty -Path $chromeRegPath -Name "(Default)" -Value $ManifestPath
-Write-Host "Added Chrome registry entry" -ForegroundColor Green
+# Chrome - ADO
+$chromeAdoRegPath = "HKCU:\Software\Google\Chrome\NativeMessagingHosts\$AdoHostName"
+New-Item -Path $chromeAdoRegPath -Force | Out-Null
+Set-ItemProperty -Path $chromeAdoRegPath -Name "(Default)" -Value $AdoManifestPath
+Write-Host "Added Chrome registry entry for ADO host" -ForegroundColor Green
 
-# Edge
-$edgeRegPath = "HKCU:\Software\Microsoft\Edge\NativeMessagingHosts\$HostName"
-New-Item -Path $edgeRegPath -Force | Out-Null
-Set-ItemProperty -Path $edgeRegPath -Name "(Default)" -Value $ManifestPath
-Write-Host "Added Edge registry entry" -ForegroundColor Green
+# Chrome - GitHub
+$chromeGhRegPath = "HKCU:\Software\Google\Chrome\NativeMessagingHosts\$GitHubHostName"
+New-Item -Path $chromeGhRegPath -Force | Out-Null
+Set-ItemProperty -Path $chromeGhRegPath -Name "(Default)" -Value $GitHubManifestPath
+Write-Host "Added Chrome registry entry for GitHub host" -ForegroundColor Green
+
+# Edge - ADO
+$edgeAdoRegPath = "HKCU:\Software\Microsoft\Edge\NativeMessagingHosts\$AdoHostName"
+New-Item -Path $edgeAdoRegPath -Force | Out-Null
+Set-ItemProperty -Path $edgeAdoRegPath -Name "(Default)" -Value $AdoManifestPath
+Write-Host "Added Edge registry entry for ADO host" -ForegroundColor Green
+
+# Edge - GitHub
+$edgeGhRegPath = "HKCU:\Software\Microsoft\Edge\NativeMessagingHosts\$GitHubHostName"
+New-Item -Path $edgeGhRegPath -Force | Out-Null
+Set-ItemProperty -Path $edgeGhRegPath -Name "(Default)" -Value $GitHubManifestPath
+Write-Host "Added Edge registry entry for GitHub host" -ForegroundColor Green
 
 # Check if logged in to Azure
 Write-Host ""

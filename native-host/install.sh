@@ -13,11 +13,13 @@ NC='\033[0m' # No Color
 # Get the directory where this script is located
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-# Native host name
-HOST_NAME="com.hellodev.ado"
+# Native host names
+ADO_HOST_NAME="com.hellodev.ado"
+GITHUB_HOST_NAME="com.hellodev.github"
 
-# Path to the native host script
-HOST_PATH="$SCRIPT_DIR/ado_token_host.js"
+# Paths to the native host scripts
+ADO_HOST_PATH="$SCRIPT_DIR/ado_token_host.js"
+GITHUB_HOST_PATH="$SCRIPT_DIR/gh_token_host.js"
 
 # Extension ID - update this after loading the extension
 EXTENSION_ID="${1:-nhfaibfkboppjdaiiaocmdkahcmglgbh}"
@@ -101,8 +103,9 @@ else
     fi
 fi
 
-# Make the host script executable
-chmod +x "$HOST_PATH"
+# Make the host scripts executable
+chmod +x "$ADO_HOST_PATH"
+chmod +x "$GITHUB_HOST_PATH"
 
 # Determine the target directory based on OS
 if [[ "$OSTYPE" == "darwin"* ]]; then
@@ -116,12 +119,26 @@ else
 fi
 
 # Create the manifest content
-create_manifest() {
+create_ado_manifest() {
     cat << EOF
 {
-  "name": "$HOST_NAME",
+  "name": "$ADO_HOST_NAME",
   "description": "HelloDev Native Host for Azure DevOps tokens",
-  "path": "$HOST_PATH",
+  "path": "$ADO_HOST_PATH",
+  "type": "stdio",
+  "allowed_origins": [
+    "chrome-extension://$EXTENSION_ID/"
+  ]
+}
+EOF
+}
+
+create_github_manifest() {
+    cat << EOF
+{
+  "name": "$GITHUB_HOST_NAME",
+  "description": "HelloDev Native Host for GitHub tokens via gh cli",
+  "path": "$GITHUB_HOST_PATH",
   "type": "stdio",
   "allowed_origins": [
     "chrome-extension://$EXTENSION_ID/"
@@ -132,16 +149,20 @@ EOF
 
 # Install for Chrome
 echo ""
-echo -e "${YELLOW}Creating native messaging manifest for Chrome...${NC}"
+echo -e "${YELLOW}Creating native messaging manifests for Chrome...${NC}"
 mkdir -p "$CHROME_TARGET_DIR"
-create_manifest > "$CHROME_TARGET_DIR/$HOST_NAME.json"
-echo -e "${GREEN}Created: $CHROME_TARGET_DIR/$HOST_NAME.json${NC}"
+create_ado_manifest > "$CHROME_TARGET_DIR/$ADO_HOST_NAME.json"
+echo -e "${GREEN}Created: $CHROME_TARGET_DIR/$ADO_HOST_NAME.json${NC}"
+create_github_manifest > "$CHROME_TARGET_DIR/$GITHUB_HOST_NAME.json"
+echo -e "${GREEN}Created: $CHROME_TARGET_DIR/$GITHUB_HOST_NAME.json${NC}"
 
 # Install for Edge
-echo -e "${YELLOW}Creating native messaging manifest for Edge...${NC}"
+echo -e "${YELLOW}Creating native messaging manifests for Edge...${NC}"
 mkdir -p "$EDGE_TARGET_DIR"
-create_manifest > "$EDGE_TARGET_DIR/$HOST_NAME.json"
-echo -e "${GREEN}Created: $EDGE_TARGET_DIR/$HOST_NAME.json${NC}"
+create_ado_manifest > "$EDGE_TARGET_DIR/$ADO_HOST_NAME.json"
+echo -e "${GREEN}Created: $EDGE_TARGET_DIR/$ADO_HOST_NAME.json${NC}"
+create_github_manifest > "$EDGE_TARGET_DIR/$GITHUB_HOST_NAME.json"
+echo -e "${GREEN}Created: $EDGE_TARGET_DIR/$GITHUB_HOST_NAME.json${NC}"
 
 # Check if logged in to Azure
 echo ""

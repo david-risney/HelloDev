@@ -8,6 +8,7 @@ export { FrameWidget } from './FrameWidget.js';
 export { GerritCLWidget } from './GerritCLWidget.js';
 export { FluidWidget } from './FluidWidget.js';
 export { ChromiumBugsWidget } from './ChromiumBugsWidget.js';
+export { GitHubPRWidget } from './GitHubPRWidget.js';
 
 import { WidgetBase } from './WidgetBase.js';
 import { ClockWidget } from './ClockWidget.js';
@@ -19,6 +20,7 @@ import { FrameWidget } from './FrameWidget.js';
 import { GerritCLWidget } from './GerritCLWidget.js';
 import { FluidWidget } from './FluidWidget.js';
 import { ChromiumBugsWidget } from './ChromiumBugsWidget.js';
+import { GitHubPRWidget } from './GitHubPRWidget.js';
 
 // Widget factory - creates the appropriate widget class instance
 export const WidgetRegistry = {
@@ -30,7 +32,8 @@ export const WidgetRegistry = {
   frame: FrameWidget,
   gerritcl: GerritCLWidget,
   fluid: FluidWidget,
-  chromiumbug: ChromiumBugsWidget
+  chromiumbug: ChromiumBugsWidget,
+  githubpr: GitHubPRWidget
 };
 
 export function createWidget(config) {

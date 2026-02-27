@@ -1837,6 +1837,100 @@ body.light-mode .ado-widget-item:hover {
 
 
 /* ==========================================================================
+   GitHub PR Widget — PR-specific styles
+   ========================================================================== */
+
+.github-pr-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.github-pr-line1 {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.github-pr-number {
+  font-size: 0.75rem;
+  color: var(--accent);
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.github-pr-title {
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.github-pr-review {
+  font-size: 0.75rem;
+  flex-shrink: 0;
+}
+
+.github-pr-draft {
+  font-size: 0.65rem;
+  padding: 0.1em 0.4em;
+  border-radius: 3px;
+  background: rgba(128, 128, 128, 0.3);
+  color: var(--text-secondary);
+  flex-shrink: 0;
+  font-weight: 500;
+}
+
+.github-pr-line2 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+}
+
+.github-pr-author {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.github-pr-age {
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.github-pr-label {
+  display: inline-block;
+  font-size: 0.6rem;
+  padding: 0.1em 0.4em;
+  border-radius: 3px;
+  color: #fff;
+  max-width: 6rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.github-pr-state-merged .github-pr-number {
+  color: #a371f7;
+}
+
+.github-pr-state-closed .github-pr-number {
+  color: #f85149;
+}
+
+.github-pr-state-draft .github-pr-number {
+  color: #8b949e;
+}
+
+
+/* ==========================================================================
    ADO Bugs Widget — Bug / Work Item specific styles
    ========================================================================== */
 

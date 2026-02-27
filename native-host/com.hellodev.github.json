@@ -1,0 +1,9 @@
+{
+  "allowed_origins": [
+    "chrome-extension://nhfaibfkboppjdaiiaocmdkahcmglgbh/"
+  ],
+  "type": "stdio",
+  "name": "com.hellodev.github",
+  "description": "HelloDev Native Host for GitHub tokens via gh cli",
+  "path": "C:\\Users\\davris\\source\\repos\\HelloDev\\native-host\\gh_token_host.bat"
+}
