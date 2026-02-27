@@ -21,20 +21,30 @@ const ADO_RESOURCE = '499b84ac-1321-427f-aa17-267ca6975798';
  */
 function findAzCli() {
   const isWindows = process.platform === 'win32';
-  
+  let timedOut = false;
+
   // First, try the commands directly (works if PATH is set correctly)
   const azCmds = isWindows ? ['az', 'az.bat', 'az.cmd'] : ['az'];
   for (const azCmd of azCmds) {
     try {
       execSync(`${azCmd} --version`, {
         encoding: 'utf8',
-        timeout: 5000,
+        timeout: 30000,
         stdio: ['pipe', 'pipe', 'pipe']
       });
       return azCmd;
     } catch (e) {
+      if (e.killed || e.signal === 'SIGTERM') {
+        timedOut = true;
+      }
       // Continue to next candidate
     }
+  }
+
+  if (timedOut) {
+    const err = new Error('Azure CLI (az) timed out. The system may still be waking up — try again in a moment.');
+    err.timedOut = true;
+    throw err;
   }
 
   return null;
@@ -114,80 +124,63 @@ function getAccessToken(resource) {
         : 'https://aka.ms/InstallAzureCLIDeb';
       return { error: `Azure CLI (az) not found. Install from ${installUrl}` };
     }
+  } catch (e) {
+    if (e.timedOut) {
+      return { error: e.message };
+    }
+    throw e;
+  }
 
-    // Check if logged in by trying to get account info
-    try {
-      execSync(`${azPath} account show`, {
+  // Check if logged in by trying to get account info
+  try {
+    execSync(`${azPath} account show`, {
+      encoding: 'utf8',
+      timeout: 60000,
+      stdio: ['pipe', 'pipe', 'pipe'],
+      shell: true
+    });
+  } catch (e) {
+    const stderr = e.stderr?.toString() || '';
+    const stdout = e.stdout?.toString() || '';
+    return {
+      error: 'Not logged in to Azure CLI. Open a terminal and run: az login',
+      details: [`az path: ${azPath}`, stderr, stdout, e.message].filter(Boolean).join('\n')
+    };
+  }
+
+  // Get the access token with expiration info
+  let result;
+  try {
+    result = execSync(
+      `${azPath} account get-access-token --resource ${targetResource} -o json`,
+      {
         encoding: 'utf8',
         timeout: 60000,
         stdio: ['pipe', 'pipe', 'pipe'],
         shell: true
-      });
-    } catch (e) {
-      const stderr = e.stderr?.toString() || '';
-      const stdout = e.stdout?.toString() || '';
-      return {
-        error: 'Not logged in to Azure CLI. Open a terminal and run: az login',
-        details: [`az path: ${azPath}`, stderr, stdout, e.message].filter(Boolean).join('\n')
-      };
-    }
-
-    // Get the access token with expiration info
-    let result;
-    try {
-      result = execSync(
-        `${azPath} account get-access-token --resource ${targetResource} -o json`,
-        {
-          encoding: 'utf8',
-          timeout: 60000,
-          stdio: ['pipe', 'pipe', 'pipe'],
-          shell: true
-        }
-      );
-    } catch (e) {
-      const stderr = e.stderr?.toString() || '';
-      const stdout = e.stdout?.toString() || '';
-      return {
-        error: 'Failed to get access token',
-        details: [`az path: ${azPath}`, stderr, stdout, e.message].filter(Boolean).join('\n')
-      };
-    }
-    
-    const tokenData = JSON.parse(result.trim());
-    if (!tokenData.accessToken) {
-      return { 
-        error: 'Empty token received. Try running: az login',
-        details: result
-      };
-    }
-    
-    return { 
-      accessToken: tokenData.accessToken,
-      expiresOn: tokenData.expiresOn  // ISO 8601 datetime string
-    };
-  } catch (error) {
-    const msg = error.message || String(error);
-    const stderr = error.stderr?.toString() || '';
-    const stdout = error.stdout?.toString() || '';
-    
-    if (msg.includes('ETIMEDOUT') || msg.includes('timeout')) {
-      return {
-        error: 'Azure CLI timed out. Open a terminal and run: az login',
-        details: [`az path: ${azPath}`, stderr, stdout, msg].filter(Boolean).join('\n')
-      };
-    }
-    if (msg.includes('AADSTS')) {
-      return {
-        error: 'Azure token expired. Open a terminal and run: az login',
-        details: [`az path: ${azPath}`, stderr, stdout, msg].filter(Boolean).join('\n')
-      };
-    }
-
+      }
+    );
+  } catch (e) {
+    const stderr = e.stderr?.toString() || '';
+    const stdout = e.stdout?.toString() || '';
     return {
-      error: `Failed to get token: ${msg}`,
-      details: [`az path: ${azPath}`, stderr, stdout, msg].filter(Boolean).join('\n')
+      error: 'Failed to get access token',
+      details: [`az path: ${azPath}`, stderr, stdout, e.message].filter(Boolean).join('\n')
     };
   }
+    
+  const tokenData = JSON.parse(result.trim());
+  if (!tokenData.accessToken) {
+    return { 
+      error: 'Empty token received. Try running: az login',
+      details: result
+    };
+  }
+    
+  return { 
+    accessToken: tokenData.accessToken,
+    expiresOn: tokenData.expiresOn  // ISO 8601 datetime string
+  };
 }
 
 /**
