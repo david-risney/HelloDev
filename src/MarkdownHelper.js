@@ -211,7 +211,10 @@ export class MarkdownHelper {
       // Inline code
       .replace(/`(.+?)`/g, '<code>$1</code>')
       
-      // Links
-      .replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2" target="_blank">$1</a>');
+      // Links — fragment-only URLs stay in-page; others open in a new tab
+      .replace(/\[(.+?)\]\((.+?)\)/g, (_match, text, url) => {
+        const attrs = url.startsWith('#') ? '' : ' target="_blank"';
+        return `<a href="${url}"${attrs}>${text}</a>`;
+      });
   }
 }

@@ -285,7 +285,7 @@ export class CalendarWidget extends WidgetBase {
 
     let statusHtml = '';
     if (this.loading) {
-      statusHtml = `<span class="ado-widget-status-indicator ado-widget-status-loading" title="${this.loadingStatus || 'Loading...'}">⟳</span>`;
+      statusHtml = `<span class="ado-widget-status-indicator ado-widget-status-loading" title="${this.loadingStatus || 'Loading...'}"></span>`;
     } else if (this.error) {
       statusHtml = `<button class="ado-widget-status-indicator ado-widget-status-error ado-widget-error-btn" title="Click to see error details">⚠️</button>`;
     }

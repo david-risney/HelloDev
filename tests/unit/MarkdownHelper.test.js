@@ -59,7 +59,20 @@ describe('MarkdownHelper', () => {
       it('converts links', () => {
         const html = MarkdownHelper.toHtml('Visit [Google](https://google.com)');
         expect(html).toContain('<a href="https://google.com"');
+        expect(html).toContain('target="_blank"');
         expect(html).toContain('>Google</a>');
+      });
+
+      it('renders fragment links without target="_blank"', () => {
+        const html = MarkdownHelper.toHtml('Click [Add Pack](#action=add&name=ado+dev)');
+        expect(html).toContain('href="#action=add');
+        expect(html).toContain('>Add Pack</a>');
+        expect(html).not.toContain('target="_blank"');
+      });
+
+      it('renders non-fragment links with target="_blank"', () => {
+        const html = MarkdownHelper.toHtml('[Docs](https://example.com)');
+        expect(html).toContain('target="_blank"');
       });
     });
 

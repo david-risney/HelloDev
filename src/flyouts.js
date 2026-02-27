@@ -2,8 +2,10 @@
 
 import { STORAGE_KEY } from './constants.js';
 import { WidgetRegistry } from './widgets/index.js';
+import { WidgetPacks } from './widgetPacks.js';
 import { getThemeModeDisplay, getNextThemeMode, saveTheme } from './theme.js';
 import { clearSync } from './syncStorage.js';
+import { safeHtml, rawHtml, escapeHtml } from './htmlUtils.js';
 
 // Button element references (set by init)
 let buttonEls = {};
@@ -78,35 +80,91 @@ function createFlyout({ id, parentEl, title, dialogClass, contentHtml, onSetup }
   return flyout;
 }
 
-// Show Add Widget flyout
-export function showAddWidgetFlyout(addWidget) {
-  // Group widgets by their metadata group
-  const groups = {};
-  for (const [type, WidgetClass] of Object.entries(WidgetRegistry)) {
-    const { name, icon, group } = WidgetClass.metadata;
-    const groupName = group || 'Utility';
-    if (!groups[groupName]) groups[groupName] = [];
-    groups[groupName].push({ type, name, icon });
+// ---- Widget Pack property prompt ----
+
+// Render a property-prompt form for a Widget Pack inside a flyout.
+function renderPackPrompt(pack) {
+  let fieldsHtml = '';
+  for (const field of pack.properties) {
+    fieldsHtml += '<div class="pack-prompt-field">';
+    switch (field.type) {
+      case 'select':
+        fieldsHtml += safeHtml`
+          <label>
+            <span>${field.label}</span>
+            <select name="pack_${field.key}">
+              ${rawHtml(field.options.map(opt => {
+                const optValue = typeof opt === 'object' ? opt.value : opt;
+                const optLabel = typeof opt === 'object' ? opt.label : opt;
+                return safeHtml`<option value="${optValue}" ${rawHtml(field.default === optValue ? 'selected' : '')}>${optLabel}</option>`;
+              }).join(''))}
+            </select>
+          </label>`;
+        break;
+      default:
+        fieldsHtml += safeHtml`
+          <label>
+            <span>${field.label}</span>
+            <input type="text" name="pack_${field.key}" value="${field.default || ''}" placeholder="${field.placeholder || ''}">
+          </label>`;
+        break;
+    }
+    fieldsHtml += '</div>';
   }
 
-  // Render groups in a defined order
-  const groupOrder = ['ADO', 'Chromium', 'GitHub', 'Utility'];
-  let contentHtml = '';
-  for (const groupName of groupOrder) {
-    const widgets = groups[groupName];
-    if (!widgets) continue;
-    let buttons = '';
-    for (const { type, name, icon } of widgets) {
-      buttons += `<button class="widget-option" data-widget="${type}">${icon} ${name}</button>`;
-    }
-    contentHtml += `
-      <div class="widget-group">
-        <div class="widget-group-label">${groupName}</div>
-        <div class="widget-options-grid">
-          ${buttons}
-        </div>
-      </div>`;
+  return `
+    <div class="pack-prompt">
+      <div class="pack-prompt-desc">${escapeHtml(pack.description)}</div>
+      <div class="pack-prompt-fields">${fieldsHtml}</div>
+      <button class="pack-prompt-submit">Add Pack</button>
+    </div>
+  `;
+}
+
+// Collect values from the pack prompt form
+function collectPackProps(flyout, pack) {
+  const props = {};
+  for (const field of pack.properties) {
+    const el = flyout.querySelector(`[name="pack_${field.key}"]`);
+    props[field.key] = el ? el.value : (field.default || '');
   }
+  return props;
+}
+
+// Show Add Widget flyout
+export function showAddWidgetFlyout(addWidget, addWidgetPack, { initialFilter } = {}) {
+  // Build pack buttons (shown first)
+  let packButtons = '';
+  for (const pack of WidgetPacks) {
+    packButtons += `<button class="widget-option pack-option" data-pack="${pack.id}">${pack.icon} ${escapeHtml(pack.name)}<span class="pack-badge">Pack</span></button>`;
+  }
+
+  // Collect all widgets and sort by group then by name
+  const widgets = Object.entries(WidgetRegistry).map(([type, WidgetClass]) => {
+    const { name, icon, group } = WidgetClass.metadata;
+    return { type, name, icon, group: group || 'Utility' };
+  });
+  widgets.sort((a, b) => a.group.localeCompare(b.group) || a.name.localeCompare(b.name));
+
+  let widgetButtons = '';
+  for (const { type, name, icon } of widgets) {
+    widgetButtons += `<button class="widget-option" data-widget="${type}">${icon} ${name}</button>`;
+  }
+
+  const contentHtml = `
+    <input type="text" class="widget-filter" placeholder="Filter widgets\u2026" />
+    <div class="widget-group pack-group">
+      <div class="widget-group-label">Packs</div>
+      <div class="widget-options-grid">
+        ${packButtons}
+      </div>
+    </div>
+    <div class="widget-group">
+      <div class="widget-group-label">Widgets</div>
+      <div class="widget-options-grid">
+        ${widgetButtons}
+      </div>
+    </div>`;
 
   createFlyout({
     id: 'addWidgetFlyout',
@@ -114,10 +172,83 @@ export function showAddWidgetFlyout(addWidget) {
     title: 'Add Widget',
     contentHtml,
     onSetup(flyout) {
-      flyout.querySelectorAll('.widget-option').forEach(btn => {
+      // Individual widget buttons
+      flyout.querySelectorAll('.widget-option[data-widget]').forEach(btn => {
         btn.addEventListener('click', () => {
           addWidget(btn.dataset.widget);
           closeAllFlyouts();
+        });
+      });
+
+      // Pack buttons — show property prompt
+      flyout.querySelectorAll('.pack-option').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const pack = WidgetPacks.find(p => p.id === btn.dataset.pack);
+          if (!pack) return;
+          showPackPromptFlyout(pack, addWidgetPack);
+        });
+      });
+
+      const filterInput = flyout.querySelector('.widget-filter');
+      filterInput.addEventListener('input', () => {
+        const term = filterInput.value.toLowerCase();
+        // Filter individual widgets
+        flyout.querySelectorAll('.widget-option[data-widget]').forEach(btn => {
+          const name = btn.textContent.toLowerCase();
+          btn.style.display = name.includes(term) ? '' : 'none';
+        });
+        // Filter packs
+        flyout.querySelectorAll('.pack-option').forEach(btn => {
+          const pack = WidgetPacks.find(p => p.id === btn.dataset.pack);
+          const text = (btn.textContent + ' ' + (pack?.description || '')).toLowerCase();
+          btn.style.display = text.includes(term) ? '' : 'none';
+        });
+        // Show/hide group labels when all children hidden
+        flyout.querySelectorAll('.widget-group').forEach(group => {
+          const visibleBtns = group.querySelectorAll('.widget-option:not([style*="display: none"])');
+          group.style.display = visibleBtns.length === 0 ? 'none' : '';
+        });
+      });
+      filterInput.focus();
+
+      // Pre-fill filter from action link if provided
+      if (initialFilter) {
+        filterInput.value = initialFilter;
+        filterInput.dispatchEvent(new Event('input'));
+      }
+    }
+  });
+}
+
+// Show the pack property prompt as its own flyout
+export function showPackPromptFlyout(pack, addWidgetPack) {
+  const contentHtml = renderPackPrompt(pack);
+
+  createFlyout({
+    id: 'packPromptFlyout',
+    parentEl: buttonEls.addWidgetBtn,
+    title: `${pack.icon} ${pack.name}`,
+    contentHtml,
+    onSetup(flyout) {
+      const submitBtn = flyout.querySelector('.pack-prompt-submit');
+      submitBtn.addEventListener('click', () => {
+        const props = collectPackProps(flyout, pack);
+        const widgetConfigs = pack.createWidgets(props);
+        addWidgetPack(widgetConfigs);
+        closeAllFlyouts();
+      });
+
+      // Focus the first input
+      const firstInput = flyout.querySelector('input[type="text"], select');
+      if (firstInput) firstInput.focus();
+
+      // Submit on Enter from text inputs
+      flyout.querySelectorAll('input[type="text"]').forEach(input => {
+        input.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            submitBtn.click();
+          }
         });
       });
     }

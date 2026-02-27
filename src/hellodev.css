@@ -209,6 +209,23 @@ body {
   overflow-y: auto;
 }
 
+.widget-filter {
+  width: 100%;
+  padding: 0.4rem 0.6rem;
+  margin-bottom: 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.widget-filter:focus {
+  border-color: var(--accent, #667eea);
+}
+
 /* Widget options list in flyout */
 .widget-group + .widget-group {
   margin-top: 0.5rem;
@@ -217,11 +234,11 @@ body {
 }
 
 .widget-group-label {
-  font-size: 0.7rem;
-  font-weight: 600;
+  font-size: 0.75rem;
+  font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-secondary);
   padding: 0.25rem 0.75rem;
 }
 
@@ -238,6 +255,83 @@ body {
   text-align: left;
   gap: 0.5rem;
   width: 100%;
+}
+
+/* Pack badge shown on pack buttons */
+.pack-badge {
+  margin-left: auto;
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  background: var(--accent, #667eea);
+  color: #fff;
+  line-height: 1;
+}
+
+/* Pack property prompt */
+.pack-prompt-desc {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.75rem;
+  text-align: left;
+}
+
+.pack-prompt-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+
+.pack-prompt-field label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.pack-prompt-field label span {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+  text-align: left;
+}
+
+.pack-prompt-field input[type="text"],
+.pack-prompt-field select {
+  width: 100%;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.pack-prompt-field input[type="text"]:focus,
+.pack-prompt-field select:focus {
+  border-color: var(--accent, #667eea);
+}
+
+.pack-prompt-submit {
+  width: 100%;
+  padding: 0.55rem 1rem;
+  border: none;
+  border-radius: 8px;
+  background: var(--accent, #667eea);
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.pack-prompt-submit:hover {
+  opacity: 0.85;
 }
 
 /* Appearance flyout */
@@ -1562,7 +1656,14 @@ body {
 }
 
 .ado-widget-status-loading {
-  animation: spin 1s linear infinite;
+  display: inline-block;
+  width: 0.9em;
+  height: 0.9em;
+  border: 2px solid var(--text-secondary, #888);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  vertical-align: middle;
 }
 
 .ado-widget-status-error {
@@ -1786,8 +1887,13 @@ body.light-mode .ado-widget-item:hover {
 }
 
 .ado-widget-spinner {
-  font-size: 2rem;
-  animation: spin 1s linear infinite;
+  display: inline-block;
+  width: 2rem;
+  height: 2rem;
+  border: 3px solid var(--text-secondary, #888);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
 }
 
 @keyframes spin {

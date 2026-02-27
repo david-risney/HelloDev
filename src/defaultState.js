@@ -45,7 +45,7 @@ export const DEFAULT_STATE = {
     }
   },
   {
-    id: 'widget-default-3',
+    id: 'widget-default-md',
     type: 'markdown',
     x: 1,
     y: 1,
@@ -54,17 +54,16 @@ export const DEFAULT_STATE = {
     zIndex: 2,
     stretchFill: false,
     data: {
-      markdown: `# Welcome to HelloDev! \ud83d\udc4b
+      markdown: `# Hello from HelloDev \ud83d\udc4b
 
-Your personal developer dashboard is ready to customize.
+## Get Started!
 
-## Getting Started
-
-- [ ] **Click the \u2630 menu** in the top-right to enter edit mode
-- [ ] **Add widgets** from the panel that appears
-- [ ] **Drag and resize widgets** to arrange your layout
-- [ ] **Configure widgets** by clicking \u2699 on each one
-- [ ] *Delete this widget when you're ready!*`,
+- [ ] Use the **[\u2630 menu](#action=edit)** in the top-right to enter edit mode
+- [ ] Add **packs** of widgets: [ADO](#action=add&name=ADO+Dev), [Chromium](#action=add&name=Chromium+Dev), [GitHub](#action=add&name=GitHub+Dev)
+- [ ] Or **[add widgets](#action=add)** one off with the \u2795 button
+- [ ] Each widget can be moved \u2725, resized \u2922 and configured \u2699
+- [ ] Personalize your dashboard **[appearance](#action=appearance)**
+- [ ] *[Delete this widget](#action=configure&id=widget-default-md) whenever!*`,
       viewMode: 'rendered'
     }
   }

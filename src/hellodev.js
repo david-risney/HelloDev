@@ -9,10 +9,12 @@ import {
   initFlyouts,
   closeAllFlyouts,
   showAddWidgetFlyout,
+  showPackPromptFlyout,
   showCustomizeFlyout,
   showAboutFlyout,
   showDataFlyout
 } from './flyouts.js';
+import { parseActionUrl, findPackByName } from './actionLinks.js';
 import { DEFAULT_STATE } from './defaultState.js';
 import { saveToSync, loadFromSync, onSyncChanged } from './syncStorage.js';
 
@@ -53,6 +55,9 @@ async function init() {
   renderDashboard();
   setupEventListeners();
   setupWidgetConfigDelegation();
+
+  // Handle action links (fragment URLs from markdown widgets)
+  setupActionLinkHandler();
 
   // Listen for state changes synced from other devices
   onSyncChanged((syncedState) => {
@@ -185,6 +190,65 @@ const saveDashboard = (() => {
 })();
 
 // ============================================================================
+// Action Links
+// ============================================================================
+
+// Handle #action=… fragment links clicked inside the dashboard (e.g. in markdown widgets).
+// On new-tab pages navigation is blocked, so we intercept clicks on any anchor
+// whose resolved URL contains an action fragment and handle it directly.
+function setupActionLinkHandler() {
+  document.documentElement.addEventListener('click', (e) => {
+    const link = e.target.closest('a');
+    if (!link) return;
+
+    // Use the anchor element's parsed hash (works even when the browser
+    // resolves the href to a full chrome-extension:// URL).
+    const hash = link.hash;
+    const parsed = parseActionUrl(hash);
+    if (!parsed) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+    handleAction(parsed);
+  });
+}
+
+function handleAction({ action, params }) {
+  // Ensure edit mode is active so toolbar flyouts can attach
+  if (!state.editMode) {
+    toggleEditMode();
+  }
+
+  switch (action) {
+    case 'add': {
+      const name = params.get('name');
+      const pack = findPackByName(name);
+      if (pack) {
+        // Exact pack match — jump straight to the pack prompt
+        showPackPromptFlyout(pack, addWidgetPack);
+      } else {
+        // No exact pack match — open the add flyout with a pre-filled filter
+        showAddWidgetFlyout(addWidget, addWidgetPack, { initialFilter: name || '' });
+      }
+      break;
+    }
+    case 'appearance':
+      showCustomizeFlyout(state, { onThemeChanged: saveDashboard });
+      break;
+    case 'configure': {
+      const id = params.get('id');
+      if (id) {
+        openWidgetConfig(id);
+      }
+      break;
+    }
+    case 'edit':
+      // Edit mode is already activated above; nothing else to do.
+      break;
+  }
+}
+
+// ============================================================================
 // Event Listeners
 // ============================================================================
 
@@ -200,7 +264,7 @@ function setupEventListeners() {
     if (document.getElementById('addWidgetFlyout')) {
       closeAllFlyouts();
     } else {
-      showAddWidgetFlyout(addWidget);
+      showAddWidgetFlyout(addWidget, addWidgetPack);
     }
   });
 
@@ -374,6 +438,22 @@ function addWidget(type) {
   const config = { id, type, x: pos.x, y: pos.y, width, height, data };
   const newWidget = createWidget(config);
   state.widgets.push(newWidget);
+  saveDashboard();
+  renderDashboard();
+}
+
+function addWidgetPack(widgetConfigs) {
+  for (const cfg of widgetConfigs) {
+    const id = `widget-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const WidgetClass = WidgetRegistry[cfg.type];
+    const width = cfg.width ?? WidgetClass?.metadata?.defaultSize?.width ?? 2;
+    const height = cfg.height ?? WidgetClass?.metadata?.defaultSize?.height ?? 2;
+    const newZIndex = WidgetClass?.metadata?.defaultZIndex ?? 2;
+    const pos = findNextPosition(width, height, newZIndex);
+    const config = { id, type: cfg.type, x: pos.x, y: pos.y, width, height, data: cfg.data || {} };
+    const newWidget = createWidget(config);
+    state.widgets.push(newWidget);
+  }
   saveDashboard();
   renderDashboard();
 }
