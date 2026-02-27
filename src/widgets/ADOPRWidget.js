@@ -35,10 +35,13 @@ export class ADOPRWidget extends ADOWidgetBase {
   }
 
   getTitleUrl() {
-    if (!this.data.repository) return null;
+    if (!this.data.organization || !this.data.project) return null;
     const org = encodeURIComponent(this.data.organization);
     const project = encodeURIComponent(this.data.project);
-    return `https://dev.azure.com/${org}/${project}/_git/${encodeURIComponent(this.data.repository)}/pullrequests`;
+    if (this.data.repository) {
+      return `https://dev.azure.com/${org}/${project}/_git/${encodeURIComponent(this.data.repository)}/pullrequests`;
+    }
+    return `https://dev.azure.com/${org}/${project}/`;
   }
 
   getItemSpecificConfigSchema() {
