@@ -11,11 +11,11 @@ describe('htmlUtils', () => {
       expect(escapeHtml('a & b')).toBe('a &amp; b');
     });
 
-    it('passes through quotes (textContent does not escape them)', () => {
-      // The escapeHtml implementation uses textContent/innerHTML which
-      // escapes <, >, & but not quotes. This is safe for element content.
-      const result = escapeHtml('"hello"');
-      expect(result).toBe('"hello"');
+    it('escapes quotes for attribute safety', () => {
+      // escapeHtml escapes <, >, &, " and ' so output is safe in both
+      // text content and attribute values.
+      expect(escapeHtml('"hello"')).toBe('&quot;hello&quot;');
+      expect(escapeHtml("it's")).toBe("it&#39;s");
     });
 
     it('handles null and undefined', () => {

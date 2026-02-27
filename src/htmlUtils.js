@@ -8,11 +8,11 @@ export function rawHtml(value) {
   return { [RAW_HTML]: true, value: String(value) };
 }
 
-// Escape a string for safe insertion into HTML
+// Escape a string for safe insertion into HTML (both text content and attributes).
 export function escapeHtml(text) {
   const div = document.createElement('div');
   div.textContent = String(text ?? '');
-  return div.innerHTML;
+  return div.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 // Tagged template literal that auto-escapes interpolated values.

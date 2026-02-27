@@ -82,7 +82,7 @@ function renderWidgetConfigFields(widget) {
 
       case 'list':
         html += safeHtml`
-          <div class="widget-config-list" data-field="${field.key}">
+          <div class="widget-config-list" data-field="${field.key}" data-fields="${JSON.stringify(field.fields)}">
             <span class="widget-config-list-label">${field.label}</span>
             <div class="widget-config-list-items">
               ${rawHtml((value || []).map((item, index) => renderListItem(field, item, index)).join(''))}
@@ -297,22 +297,27 @@ export function setupWidgetConfigDelegation() {
         const existingItems = itemsContainer.querySelectorAll('.widget-config-list-item');
         const newIndex = existingItems.length;
 
-        const firstItem = existingItems[0];
-        if (firstItem) {
+        // Read field definitions from the data attribute so this works
+        // even when the list is empty (no existing item to clone from)
+        let subFields;
+        try {
+          subFields = JSON.parse(listContainer.dataset.fields || '[]');
+        } catch {
+          subFields = [];
+        }
+
+        if (subFields.length > 0) {
           const newItem = document.createElement('div');
           newItem.className = 'widget-config-list-item';
           newItem.dataset.index = newIndex;
 
-          const inputs = firstItem.querySelectorAll('input[type="text"]');
-          inputs.forEach(input => {
-            const nameParts = input.name.split('_');
-            const subFieldKey = nameParts[nameParts.length - 1];
+          for (const subField of subFields) {
             const newInput = document.createElement('input');
             newInput.type = 'text';
-            newInput.name = `config_${fieldKey}_${newIndex}_${subFieldKey}`;
-            newInput.placeholder = input.placeholder;
+            newInput.name = `config_${fieldKey}_${newIndex}_${subField.key}`;
+            newInput.placeholder = subField.label || subField.key;
             newItem.appendChild(newInput);
-          });
+          }
 
           const removeBtn = document.createElement('button');
           removeBtn.type = 'button';

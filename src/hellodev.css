@@ -1120,6 +1120,119 @@ body {
 }
 
 
+/* Top Sites Widget */
+.widget-topsites .widget-content {
+  height: 100%;
+  overflow-y: auto;
+  padding: 0;
+}
+
+.topsites-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  gap: 0.125rem 0.5rem;
+  padding: 0.125rem;
+}
+
+.topsites-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.2rem 0.25rem;
+  border-radius: 8px;
+  text-decoration: none;
+  color: var(--text-primary);
+  transition: background 0.15s ease;
+  overflow: hidden;
+}
+
+.topsites-tile:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.topsites-favicon {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.topsites-favicon img {
+  border-radius: 4px;
+}
+
+.topsites-favicon-fallback {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.15);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.topsites-label {
+  font-size: 0.7rem;
+  text-align: center;
+  line-height: 1.2;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-secondary);
+}
+
+.topsites-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.topsites-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 0.5rem;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.topsites-empty-icon {
+  font-size: 2rem;
+}
+
+.topsites-empty p {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.topsites-retry {
+  padding: 0.3rem 0.8rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+
+.topsites-retry:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+
 /* Markdown Widget */
 .widget-markdown .widget-content {
   height: 100%;

@@ -6,7 +6,9 @@
   "permissions": [
     "nativeMessaging",
     "identity",
-    "storage"
+    "storage",
+    "topSites",
+    "favicon"
   ],
   "host_permissions": [
     "https://login.microsoftonline.com/*",
