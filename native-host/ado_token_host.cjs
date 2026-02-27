@@ -16,35 +16,29 @@ const os = require('os');
 const ADO_RESOURCE = '499b84ac-1321-427f-aa17-267ca6975798';
 
 /**
- * Find the az CLI executable
- * Chrome's native host may not have the full user PATH
+ * Find the az CLI executable.
+ * Uses where/which for a fast filesystem lookup instead of invoking az
+ * (which starts the Python runtime and can take several seconds).
+ * Chrome's native host may not have the full user PATH.
  */
 function findAzCli() {
   const isWindows = process.platform === 'win32';
-  let timedOut = false;
+  const locateCmd = isWindows ? 'where' : 'which';
 
-  // First, try the commands directly (works if PATH is set correctly)
-  const azCmds = isWindows ? ['az', 'az.bat', 'az.cmd'] : ['az'];
+  // Candidates: on Windows az ships as az.cmd; 'az' alone may also work.
+  const azCmds = isWindows ? ['az.cmd', 'az'] : ['az'];
   for (const azCmd of azCmds) {
     try {
-      execSync(`${azCmd} --version`, {
+      const result = execSync(`${locateCmd} ${azCmd}`, {
         encoding: 'utf8',
-        timeout: 30000,
+        timeout: 5000,
         stdio: ['pipe', 'pipe', 'pipe']
       });
-      return azCmd;
-    } catch (e) {
-      if (e.killed || e.signal === 'SIGTERM') {
-        timedOut = true;
-      }
-      // Continue to next candidate
+      // where/which prints the resolved path — if it succeeds the command exists
+      if (result.trim()) return azCmd;
+    } catch (_) {
+      // Not found via this candidate, try next
     }
-  }
-
-  if (timedOut) {
-    const err = new Error('Azure CLI (az) timed out. The system may still be waking up — try again in a moment.');
-    err.timedOut = true;
-    throw err;
   }
 
   return null;
@@ -113,42 +107,20 @@ function writeMessage(message) {
  */
 function getAccessToken(resource) {
   const targetResource = resource || ADO_RESOURCE;
-  let azPath = null;
 
-  try {
-    // Find the az CLI executable
-    azPath = findAzCli();
-    if (!azPath) {
-      const installUrl = process.platform === 'win32'
-        ? 'https://aka.ms/installazurecliwindows'
-        : 'https://aka.ms/InstallAzureCLIDeb';
-      return { error: `Azure CLI (az) not found. Install from ${installUrl}` };
-    }
-  } catch (e) {
-    if (e.timedOut) {
-      return { error: e.message };
-    }
-    throw e;
+  // Find the az CLI executable (fast where/which lookup)
+  const azPath = findAzCli();
+  if (!azPath) {
+    const installUrl = process.platform === 'win32'
+      ? 'https://aka.ms/installazurecliwindows'
+      : 'https://aka.ms/InstallAzureCLIDeb';
+    return { error: `Azure CLI (az) not found. Install from ${installUrl}` };
   }
 
-  // Check if logged in by trying to get account info
-  try {
-    execSync(`${azPath} account show`, {
-      encoding: 'utf8',
-      timeout: 60000,
-      stdio: ['pipe', 'pipe', 'pipe'],
-      shell: true
-    });
-  } catch (e) {
-    const stderr = e.stderr?.toString() || '';
-    const stdout = e.stdout?.toString() || '';
-    return {
-      error: 'Not logged in to Azure CLI. Open a terminal and run: az login',
-      details: [`az path: ${azPath}`, stderr, stdout, e.message].filter(Boolean).join('\n')
-    };
-  }
-
-  // Get the access token with expiration info
+  // Get the access token directly — this single call tells us everything:
+  // - whether az works
+  // - whether we're logged in
+  // - the token itself
   let result;
   try {
     result = execSync(
@@ -161,8 +133,27 @@ function getAccessToken(resource) {
       }
     );
   } catch (e) {
-    const stderr = e.stderr?.toString() || '';
-    const stdout = e.stdout?.toString() || '';
+    const stderr = (e.stderr?.toString() || '').trim();
+    const stdout = (e.stdout?.toString() || '').trim();
+    const combined = `${stderr} ${stdout}`.toLowerCase();
+
+    // Detect login-related errors from get-access-token output
+    const isLoginError =
+      combined.includes('az login') ||
+      combined.includes('please run') ||
+      combined.includes('aadsts') ||
+      combined.includes('no subscription') ||
+      combined.includes('not logged in') ||
+      combined.includes('refresh token') ||
+      combined.includes('interactive login');
+
+    if (isLoginError) {
+      return {
+        error: 'Not logged in to Azure CLI. Open a terminal and run: az login',
+        details: [`az path: ${azPath}`, stderr, stdout, e.message].filter(Boolean).join('\n')
+      };
+    }
+
     return {
       error: 'Failed to get access token',
       details: [`az path: ${azPath}`, stderr, stdout, e.message].filter(Boolean).join('\n')

@@ -11,21 +11,24 @@ const { execSync } = require('child_process');
 
 /**
  * Find the gh CLI executable.
+ * Uses where/which for a fast filesystem lookup instead of invoking gh
+ * (avoids startup overhead).
  * Chrome's native host may not have the full user PATH.
  */
 function findGhCli() {
   const isWindows = process.platform === 'win32';
+  const locateCmd = isWindows ? 'where' : 'which';
 
   // Try the command directly (works if PATH is set correctly)
-  const ghCmds = isWindows ? ['gh', 'gh.exe'] : ['gh'];
+  const ghCmds = isWindows ? ['gh.exe', 'gh'] : ['gh'];
   for (const ghCmd of ghCmds) {
     try {
-      execSync(`${ghCmd} --version`, {
+      const result = execSync(`${locateCmd} ${ghCmd}`, {
         encoding: 'utf8',
         timeout: 5000,
         stdio: ['pipe', 'pipe', 'pipe']
       });
-      return ghCmd;
+      if (result.trim()) return ghCmd;
     } catch {
       // Continue to next candidate
     }
@@ -45,16 +48,10 @@ function findGhCli() {
         `${process.env.HOME}/.local/bin/gh`
       ];
 
+  const { existsSync } = require('fs');
   for (const candidate of candidates) {
-    try {
-      execSync(`"${candidate}" --version`, {
-        encoding: 'utf8',
-        timeout: 5000,
-        stdio: ['pipe', 'pipe', 'pipe']
-      });
+    if (existsSync(candidate)) {
       return `"${candidate}"`;
-    } catch {
-      // Continue
     }
   }
 
@@ -121,80 +118,61 @@ function writeMessage(message) {
  * Get a GitHub access token using gh auth token.
  */
 function getAccessToken() {
-  let ghPath = null;
+  const ghPath = findGhCli();
+  if (!ghPath) {
+    const installUrl = 'https://cli.github.com/';
+    return { error: `GitHub CLI (gh) not found. Install from ${installUrl}` };
+  }
 
+  // Get the token directly — a single call that also reveals auth status.
+  // If the user isn't logged in, gh auth token exits non-zero with a
+  // descriptive message, so a separate `gh auth status` check is unnecessary.
+  let token;
   try {
-    ghPath = findGhCli();
-    if (!ghPath) {
-      const installUrl = 'https://cli.github.com/';
-      return { error: `GitHub CLI (gh) not found. Install from ${installUrl}` };
-    }
+    token = execSync(`${ghPath} auth token`, {
+      encoding: 'utf8',
+      timeout: 15000,
+      stdio: ['pipe', 'pipe', 'pipe'],
+      shell: true
+    }).trim();
+  } catch (e) {
+    const stderr = (e.stderr?.toString() || '').trim();
+    const stdout = (e.stdout?.toString() || '').trim();
+    const combined = `${stderr} ${stdout}`.toLowerCase();
 
-    // Check auth status
-    try {
-      execSync(`${ghPath} auth status`, {
-        encoding: 'utf8',
-        timeout: 15000,
-        stdio: ['pipe', 'pipe', 'pipe'],
-        shell: true
-      });
-    } catch (e) {
-      const stderr = e.stderr?.toString() || '';
-      const stdout = e.stdout?.toString() || '';
-      // gh auth status exits 1 when not logged in
-      if (stderr.includes('not logged') || stderr.includes('no token') ||
-          stdout.includes('not logged') || stdout.includes('no token')) {
-        return {
-          error: 'Not logged in to GitHub CLI. Open a terminal and run: gh auth login',
-          details: [stderr, stdout].filter(Boolean).join('\n')
-        };
-      }
-      // Otherwise it might have succeeded (gh auth status exits 0 on success
-      // but some versions write to stderr too) — continue to get token
-    }
+    const isLoginError =
+      combined.includes('not logged') ||
+      combined.includes('no token') ||
+      combined.includes('gh auth login') ||
+      combined.includes('no oauth');
 
-    // Get the token
-    let token;
-    try {
-      token = execSync(`${ghPath} auth token`, {
-        encoding: 'utf8',
-        timeout: 15000,
-        stdio: ['pipe', 'pipe', 'pipe'],
-        shell: true
-      }).trim();
-    } catch (e) {
-      const stderr = e.stderr?.toString() || '';
-      const stdout = e.stdout?.toString() || '';
+    if (isLoginError) {
       return {
-        error: 'Failed to get GitHub token. Run: gh auth login',
-        details: [`gh path: ${ghPath}`, stderr, stdout, e.message].filter(Boolean).join('\n')
+        error: 'Not logged in to GitHub CLI. Open a terminal and run: gh auth login',
+        details: [`gh path: ${ghPath}`, stderr, stdout].filter(Boolean).join('\n')
       };
     }
 
-    if (!token) {
-      return {
-        error: 'Empty token received from gh CLI. Try running: gh auth login'
-      };
-    }
-
-    // gh auth token doesn't provide expiry info, so we set a generous TTL.
-    // The token is typically a long-lived OAuth token managed by gh.
-    const expiresOn = new Date(Date.now() + 60 * 60 * 1000).toISOString(); // 1 hour cache
-
     return {
-      accessToken: token,
-      expiresOn
-    };
-  } catch (error) {
-    const msg = error.message || String(error);
-    const stderr = error.stderr?.toString() || '';
-    const stdout = error.stdout?.toString() || '';
-
-    return {
-      error: `Failed to get GitHub token: ${msg}`,
-      details: [`gh path: ${ghPath}`, stderr, stdout, msg].filter(Boolean).join('\n')
+      error: 'Failed to get GitHub token. Run: gh auth login',
+      details: [`gh path: ${ghPath}`, stderr, stdout, e.message].filter(Boolean).join('\n')
     };
   }
+
+  if (!token) {
+    return {
+      error: 'Empty token received from gh CLI. Try running: gh auth login'
+    };
+  }
+
+  // gh auth token doesn't provide expiry info, so we set a generous TTL.
+  // The token is typically a long-lived OAuth token managed by gh.
+  const expiresOn = new Date(Date.now() + 60 * 60 * 1000).toISOString(); // 1 hour cache
+
+  return {
+    accessToken: token,
+    expiresOn
+  };
 }
 
 /**

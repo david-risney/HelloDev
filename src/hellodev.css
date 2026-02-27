@@ -1121,6 +1121,10 @@ body {
 
 
 /* Top Sites Widget */
+.widget-topsites {
+  padding: 0.375rem;
+}
+
 .widget-topsites .widget-content {
   height: 100%;
   overflow-y: auto;
@@ -1130,8 +1134,8 @@ body {
 .topsites-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
-  gap: 0.125rem 0.5rem;
-  padding: 0.125rem;
+  gap: 0.125rem 0.25rem;
+  padding: 0;
 }
 
 .topsites-tile {

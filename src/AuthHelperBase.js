@@ -11,6 +11,7 @@
 import { PromiseCoalescer } from './PromiseCoalescer.js';
 
 const TOKEN_EXPIRY_BUFFER_MS = 60 * 1000;
+const SEND_MESSAGE_TIMEOUT_MS = 35_000;
 
 export class AuthHelperBase {
   // --- Cache ---
@@ -96,6 +97,50 @@ export class AuthHelperBase {
     }
 
     return promise;
+  }
+
+  /**
+   * Send a message to the background script with a timeout.
+   * Shared by ADOAuthHelper and GitHubAuthHelper.
+   * @param {object} message
+   * @returns {Promise<object>}
+   */
+  static sendMessage(message) {
+    return new Promise((resolve, reject) => {
+      if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) {
+        reject(new Error('Extension API not available'));
+        return;
+      }
+
+      let settled = false;
+      const timer = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        console.error(`${this.LOG_PREFIX} sendMessage timed out after ${SEND_MESSAGE_TIMEOUT_MS}ms for`, message.type);
+        reject(new Error(
+          `Token request timed out after ${SEND_MESSAGE_TIMEOUT_MS / 1000}s. ` +
+          'The native host or CLI may be unresponsive.'
+        ));
+      }, SEND_MESSAGE_TIMEOUT_MS);
+
+      chrome.runtime.sendMessage(message, (response) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+
+        if (chrome.runtime.lastError) {
+          reject(new Error('Extension communication error. Try reloading the page.'));
+        } else if (response?.error) {
+          const err = new Error(response.error);
+          err.details = response.details || null;
+          reject(err);
+        } else if (!response) {
+          reject(new Error('No response from background script'));
+        } else {
+          resolve(response);
+        }
+      });
+    });
   }
 
   /**

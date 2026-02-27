@@ -40,25 +40,51 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 });
 
+// Timeout for native host responses (ms)
+const NATIVE_HOST_TIMEOUT_MS = 30_000;
+
 // Get access token via native messaging host
 async function getNativeToken(hostName, resource) {
   return new Promise((resolve) => {
+    const startTime = Date.now();
+    let settled = false;
+
+    function settle(result) {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      const elapsed = Date.now() - startTime;
+      console.log(`[background] getNativeToken settled in ${elapsed}ms`);
+      resolve(result);
+    }
+
+    // Timeout to prevent hanging forever if the native host never responds
+    const timer = setTimeout(() => {
+      console.error(`[background] Native host ${hostName} timed out after ${NATIVE_HOST_TIMEOUT_MS}ms`);
+      try { port.disconnect(); } catch (_) { /* ignore */ }
+      settle({
+        error: `Native host timed out after ${NATIVE_HOST_TIMEOUT_MS / 1000}s. ` +
+               'The CLI may be unresponsive — check that it works from a terminal.'
+      });
+    }, NATIVE_HOST_TIMEOUT_MS);
+
+    let port;
     try {
       console.log('[background] Connecting to native host:', hostName);
-      const port = chrome.runtime.connectNative(hostName);
+      port = chrome.runtime.connectNative(hostName);
 
       port.onMessage.addListener((response) => {
         console.log('[background] Native host response received');
         port.disconnect();
         if (response.error) {
           console.log('[background] Native host error:', response.error, response.details || '');
-          resolve({ error: response.error, details: response.details });
+          settle({ error: response.error, details: response.details });
         } else if (response.accessToken) {
           console.log('[background] Got token, expiresOn:', response.expiresOn);
-          resolve({ accessToken: response.accessToken, expiresOn: response.expiresOn });
+          settle({ accessToken: response.accessToken, expiresOn: response.expiresOn });
         } else {
-          console.log('[background] Invalid response from native host:', response);
-          resolve({ error: 'Invalid response from native host' });
+          console.log('[background] Invalid response from native host:', JSON.stringify(response));
+          settle({ error: 'Invalid response from native host' });
         }
       });
 
@@ -66,9 +92,11 @@ async function getNativeToken(hostName, resource) {
         const error = chrome.runtime.lastError;
         if (error) {
           console.error('[background] Native host disconnected with error:', error.message);
-          resolve({
+          settle({
             error: `Native host error: ${error.message}. Make sure the native host is installed.`
           });
+        } else {
+          console.log('[background] Native host disconnected normally');
         }
       });
 
@@ -78,7 +106,7 @@ async function getNativeToken(hostName, resource) {
       port.postMessage(message);
     } catch (error) {
       console.error('[background] Exception connecting to native host:', error);
-      resolve({ error: error.message });
+      settle({ error: error.message });
     }
   });
 }
