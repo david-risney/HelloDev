@@ -250,6 +250,46 @@ Some *text* with **bold**.
       expect(md).toContain('[x]');
       expect(md).toContain('[ ]');
     });
+
+    it('converts nested unordered lists with indentation', () => {
+      const el = document.createElement('div');
+      el.innerHTML = '<ul><li>Parent<ul><li>Child 1</li><li>Child 2</li></ul></li><li>Sibling</li></ul>';
+      const md = MarkdownHelper.toMarkdown(el);
+      expect(md).toContain('- Parent');
+      expect(md).toContain('  - Child 1');
+      expect(md).toContain('  - Child 2');
+      expect(md).toContain('- Sibling');
+    });
+
+    it('converts deeply nested lists with increasing indentation', () => {
+      const el = document.createElement('div');
+      el.innerHTML = '<ul><li>L0<ul><li>L1<ul><li>L2</li></ul></li></ul></li></ul>';
+      const md = MarkdownHelper.toMarkdown(el);
+      expect(md).toContain('- L0');
+      expect(md).toContain('  - L1');
+      expect(md).toContain('    - L2');
+    });
+
+    it('converts nested ordered list inside unordered list', () => {
+      const el = document.createElement('div');
+      el.innerHTML = '<ul><li>Parent<ol><li>First</li><li>Second</li></ol></li></ul>';
+      const md = MarkdownHelper.toMarkdown(el);
+      expect(md).toContain('- Parent');
+      expect(md).toContain('  1. First');
+      expect(md).toContain('  2. Second');
+    });
+
+    it('round-trips nested lists through toHtml and back', () => {
+      const original = '- Parent\n  - Child 1\n  - Child 2\n- Sibling';
+      const html = MarkdownHelper.toHtml(original);
+      const el = document.createElement('div');
+      el.innerHTML = html;
+      const md = MarkdownHelper.toMarkdown(el);
+      expect(md).toContain('- Parent');
+      expect(md).toContain('  - Child 1');
+      expect(md).toContain('  - Child 2');
+      expect(md).toContain('- Sibling');
+    });
   });
 
   describe('parseLine', () => {

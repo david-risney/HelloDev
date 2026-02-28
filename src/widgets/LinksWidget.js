@@ -1,30 +1,33 @@
 import { WidgetBase } from './WidgetBase.js';
 
 /**
- * Top Sites widget — displays frequently visited sites using the
- * chrome.topSites API, rendered as a grid of favicon tiles.
+ * Links widget — displays a grid of links combining top sites, recently
+ * closed tabs, and user-pinned sites.
  *
  * Configuration:
+ *   - includeTopSites:    include frequently visited sites (chrome.topSites)
+ *   - includeRecentlyClosed: include recently closed tabs (chrome.sessions)
  *   - hidePatterns: list of regex patterns; matching URLs are hidden
  *   - pinnedSites:  list of { url, title } entries that are always shown
  *   - maxItems:     maximum number of sites to display
- *   - columns:      number of grid columns
  */
-export class TopSitesWidget extends WidgetBase {
+export class LinksWidget extends WidgetBase {
   static metadata = {
-    name: 'Top Sites',
-    icon: '⭐',
+    name: 'Links',
+    icon: '🔗',
     group: 'Utility',
     defaultSize: { width: 4, height: 3 }
   };
 
   constructor(config) {
-    super({ ...config, type: 'topsites' });
+    super({ ...config, type: 'links' });
     this.sites = [];
     this.loading = false;
     this.error = null;
     this.intervalId = null;
 
+    this.data.includeTopSites ??= true;
+    this.data.includeRecentlyClosed ??= false;
     this.data.maxItems ??= 12;
     this.data.hidePatterns ??= [];
     this.data.pinnedSites ??= [];
@@ -36,6 +39,8 @@ export class TopSitesWidget extends WidgetBase {
 
   getConfigSchema() {
     return [
+      { key: 'includeTopSites', label: 'Include Top Sites', type: 'boolean', default: true },
+      { key: 'includeRecentlyClosed', label: 'Recently Closed Tabs', type: 'boolean', default: false },
       { key: 'maxItems', label: 'Max Sites to Show', type: 'number', default: 12 },
       {
         key: 'hidePatterns',
@@ -107,7 +112,8 @@ export class TopSitesWidget extends WidgetBase {
   }
 
   /**
-   * Fetch top sites from the chrome.topSites API and merge with pinned sites.
+   * Fetch top sites from the chrome.topSites API and merge with pinned sites
+   * and recently closed tabs.
    */
   async refresh() {
     if (this.loading) return;
@@ -116,27 +122,61 @@ export class TopSitesWidget extends WidgetBase {
     this.updateContent();
 
     try {
-      const topSites = await this.fetchTopSites();
+      let allSites = [];
+
+      // Fetch top sites if enabled
+      if (this.data.includeTopSites) {
+        try {
+          const topSites = await this.fetchTopSites();
+          allSites.push(...topSites);
+        } catch {
+          // Top sites unavailable — continue with other sources
+        }
+      }
+
+      // Fetch recently closed tabs if enabled
+      if (this.data.includeRecentlyClosed) {
+        try {
+          const recentTabs = await this.fetchRecentlyClosed();
+          allSites.push(...recentTabs);
+        } catch {
+          // Sessions API unavailable — continue with other sources
+        }
+      }
+
       const hideRegexes = this.getHideRegexes();
 
       // Filter out hidden URLs
-      const filtered = topSites.filter(site =>
+      const filtered = allSites.filter(site =>
         !hideRegexes.some(re => re.test(site.url))
       );
 
+      // Deduplicate by URL (case-insensitive)
+      const seen = new Set();
+      const deduped = filtered.filter(s => {
+        const key = s.url.toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+
       // Build a set of already-present URLs (case-insensitive origin+path)
-      const urlSet = new Set(filtered.map(s => s.url.toLowerCase()));
+      const urlSet = new Set(deduped.map(s => s.url.toLowerCase()));
 
       // Prepend pinned sites that aren't already in the list
       const pinned = (this.data.pinnedSites || [])
         .filter(s => s?.url && !urlSet.has(s.url.toLowerCase()));
 
-      const merged = [...pinned, ...filtered];
+      const merged = [...pinned, ...deduped];
 
       const max = Math.max(1, this.data.maxItems || 12);
       this.sites = merged.slice(0, max);
+
+      if (this.sites.length === 0 && !this.data.includeTopSites && !this.data.includeRecentlyClosed && (!this.data.pinnedSites || this.data.pinnedSites.length === 0)) {
+        this.error = 'Enable Top Sites or Recently Closed Tabs, or add pinned sites';
+      }
     } catch (err) {
-      this.error = err.message || 'Failed to load top sites';
+      this.error = err.message || 'Failed to load sites';
     } finally {
       this.loading = false;
       this.updateContent();
@@ -152,6 +192,31 @@ export class TopSitesWidget extends WidgetBase {
       throw new Error('chrome.topSites API is not available');
     }
     return chrome.topSites.get();
+  }
+
+  /**
+   * Fetches recently closed tabs via chrome.sessions.getRecentlyClosed.
+   * Separated for easy mocking in tests.
+   */
+  async fetchRecentlyClosed() {
+    if (typeof chrome === 'undefined' || !chrome.sessions?.getRecentlyClosed) {
+      throw new Error('chrome.sessions API is not available');
+    }
+    const sessions = await chrome.sessions.getRecentlyClosed();
+    // Extract tabs from sessions (sessions can contain tabs or windows)
+    const tabs = [];
+    for (const session of sessions) {
+      if (session.tab && session.tab.url) {
+        tabs.push({ url: session.tab.url, title: session.tab.title || '' });
+      } else if (session.window?.tabs) {
+        for (const tab of session.window.tabs) {
+          if (tab.url) {
+            tabs.push({ url: tab.url, title: tab.title || '' });
+          }
+        }
+      }
+    }
+    return tabs;
   }
 
   // ---------------------------------------------------------------------------
@@ -176,14 +241,14 @@ export class TopSitesWidget extends WidgetBase {
     if (this.sites.length === 0) {
       return `
         <div class="topsites-empty">
-          <div class="topsites-empty-icon">⭐</div>
-          <p>No frequently visited sites yet</p>
+          <div class="topsites-empty-icon">🔗</div>
+          <p>No links to show yet</p>
         </div>
       `;
     }
 
     const tiles = this.sites.map(site => {
-      const favicon = TopSitesWidget.getFaviconUrl(site.url);
+      const favicon = LinksWidget.getFaviconUrl(site.url);
       const title = this.escapeHtml(site.title || this.getDomainLabel(site.url));
       const href = this.escapeHtml(site.url);
       return `

@@ -1,0 +1,10 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Run ClockWidget Tests",
+			"type": "shell",
+			"command": "npx vitest run tests/unit/ClockWidget.test.js"
+		}
+	]
+}

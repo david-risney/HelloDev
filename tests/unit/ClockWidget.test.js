@@ -65,7 +65,7 @@ describe('ClockWidget', () => {
       widget.data.style = 'Modern';
       const content = widget.getContent();
       expect(content).toContain('style-modern');
-      expect(content).toContain('modern-box');
+      expect(content).toContain('flux-face');
     });
   });
 

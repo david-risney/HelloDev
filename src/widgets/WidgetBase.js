@@ -211,7 +211,115 @@ export class WidgetBase {
    * Called when widget is removed from the dashboard.
    */
   destroy() {
+    this.restoreFromMaximize();
     // Override in subclasses that need cleanup
+  }
+
+  /**
+   * Toggle the widget between maximized (full-screen) and normal state.
+   * When maximized, a backdrop overlay provides light-dismiss behavior.
+   */
+  toggleMaximize() {
+    if (this.element?.classList.contains('widget-maximized')) {
+      this.restoreFromMaximize();
+    } else {
+      this.maximize();
+    }
+  }
+
+  /**
+   * Maximize the widget to fill the viewport with a high z-index.
+   */
+  maximize() {
+    const el = this.element;
+    if (!el) return;
+
+    // Save original grid position and z-index for restore
+    this._savedGridColumn = el.style.gridColumn;
+    this._savedGridRow = el.style.gridRow;
+    this._savedZIndex = el.style.zIndex;
+
+    // Create backdrop overlay for light dismiss
+    this._backdrop = document.createElement('div');
+    this._backdrop.className = 'widget-maximize-backdrop';
+    this._backdrop.addEventListener('click', () => this.restoreFromMaximize());
+
+    // Also dismiss on Escape key
+    this._escHandler = (e) => {
+      if (e.key === 'Escape') this.restoreFromMaximize();
+    };
+    document.addEventListener('keydown', this._escHandler);
+
+    el.parentElement.appendChild(this._backdrop);
+    el.classList.add('widget-maximized');
+    // Clear inline grid styles so the CSS class rules take effect
+    el.style.gridColumn = '';
+    el.style.gridRow = '';
+    el.style.zIndex = '10000';
+
+    // Update the button to show restore icon
+    const btn = el.querySelector('.widget-control.maximize');
+    if (btn) {
+      btn.textContent = '⧉';
+      btn.title = 'Restore';
+    }
+  }
+
+  /**
+   * Restore the widget from maximized state to its normal grid position.
+   */
+  restoreFromMaximize() {
+    const el = this.element;
+    if (!el || !el.classList.contains('widget-maximized')) return;
+
+    el.classList.remove('widget-maximized');
+    el.style.gridColumn = this._savedGridColumn;
+    el.style.gridRow = this._savedGridRow;
+    el.style.zIndex = this._savedZIndex ?? this.zIndex;
+
+    if (this._backdrop) {
+      this._backdrop.remove();
+      this._backdrop = null;
+    }
+    if (this._escHandler) {
+      document.removeEventListener('keydown', this._escHandler);
+      this._escHandler = null;
+    }
+
+    // Restore the button icon
+    const btn = el.querySelector('.widget-control.maximize');
+    if (btn) {
+      btn.textContent = '⛶';
+      btn.title = 'Maximize';
+    }
+  }
+
+  /**
+   * Toggle the widget between normal height and height=1 (minimized/rolled-up).
+   */
+  toggleMinimize() {
+    const el = this.element;
+    if (!el) return;
+
+    if (this._minimizedFromHeight) {
+      // Restore to original height
+      this.height = this._minimizedFromHeight;
+      this._minimizedFromHeight = null;
+      el.classList.remove('widget-minimized');
+      this.applyGridPosition();
+
+      const btn = el.querySelector('.widget-control.minimize');
+      if (btn) { btn.textContent = '\u2581'; btn.title = 'Minimize'; }
+    } else {
+      // Minimize to height 1
+      this._minimizedFromHeight = this.height;
+      this.height = 1;
+      el.classList.add('widget-minimized');
+      this.applyGridPosition();
+
+      const btn = el.querySelector('.widget-control.minimize');
+      if (btn) { btn.textContent = '\u25A3'; btn.title = 'Restore'; }
+    }
   }
 
   /**
@@ -251,8 +359,12 @@ export class WidgetBase {
     el.style.zIndex = this.zIndex;
     this.applyGridPosition();
 
+    this._resizeWidget = resizeWidget;
+
     el.innerHTML = `
       <button class="widget-control drag-handle" title="Drag to move">✥</button>
+      <button class="widget-control minimize" title="Minimize">▁</button>
+      <button class="widget-control maximize" title="Maximize">⛶</button>
       <button class="widget-control config" title="Configure">⚙</button>
       <button class="widget-control resize-handle" title="Drag to resize">⤢</button>
       <div class="widget-content">
@@ -263,6 +375,16 @@ export class WidgetBase {
     this.setupBehavior(el);
 
     // Setup control buttons
+    el.querySelector('.widget-control.minimize').addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.toggleMinimize();
+    });
+
+    el.querySelector('.widget-control.maximize').addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.toggleMaximize();
+    });
+
     el.querySelector('.widget-control.config').addEventListener('click', (e) => {
       e.stopPropagation();
       openWidgetConfig(this.id);

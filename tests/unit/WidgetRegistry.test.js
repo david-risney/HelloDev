@@ -11,7 +11,8 @@ describe('WidgetRegistry', () => {
   it('has entries for all registered widget types', () => {
     const expectedTypes = [
       'clock', 'search', 'markdown', 'adopr', 'adobugs',
-      'frame', 'gerritcl', 'fluid', 'chromiumbug', 'githubpr'
+      'frame', 'gerritcl', 'fluid', 'chromiumbug', 'githubpr',
+      'links'
     ];
     for (const type of expectedTypes) {
       expect(WidgetRegistry).toHaveProperty(type);

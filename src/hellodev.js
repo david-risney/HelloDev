@@ -332,6 +332,13 @@ function toggleEditMode() {
   dataBtn.classList.toggle('visible', state.editMode);
   aboutBtn.classList.toggle('visible', state.editMode);
 
+  if (state.editMode) {
+    // Restore any maximized widgets when entering edit mode
+    for (const widget of state.widgets) {
+      widget.restoreFromMaximize();
+    }
+  }
+
   if (!state.editMode) {
     closeAllFlyouts();
   }

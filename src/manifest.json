@@ -8,6 +8,7 @@
     "identity",
     "storage",
     "topSites",
+    "sessions",
     "favicon"
   ],
   "host_permissions": [
@@ -16,7 +17,9 @@
     "https://oauth2.googleapis.com/*",
     "https://*.googlesource.com/*",
     "https://issuetracker.googleapis.com/*",
-    "https://issues.chromium.org/*"
+    "https://issues.chromium.org/*",
+    "https://devboxes.azure.com/*",
+    "https://*.devcenter.azure.com/*"
   ],
   "action": {
     "default_title": "HelloDev",

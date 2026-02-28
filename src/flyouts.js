@@ -139,11 +139,15 @@ export function showAddWidgetFlyout(addWidget, addWidgetPack, { initialFilter } 
     packButtons += `<button class="widget-option pack-option" data-pack="${pack.id}">${pack.icon} ${escapeHtml(pack.name)}<span class="pack-badge">Pack</span></button>`;
   }
 
-  // Collect all widgets and sort by group then by name
-  const widgets = Object.entries(WidgetRegistry).map(([type, WidgetClass]) => {
+  // Collect all widgets and sort by group then by name (deduplicate aliases)
+  const seen = new Set();
+  const widgets = Object.entries(WidgetRegistry).reduce((acc, [type, WidgetClass]) => {
+    if (seen.has(WidgetClass)) return acc;
+    seen.add(WidgetClass);
     const { name, icon, group } = WidgetClass.metadata;
-    return { type, name, icon, group: group || 'Utility' };
-  });
+    acc.push({ type, name, icon, group: group || 'Utility' });
+    return acc;
+  }, []);
   widgets.sort((a, b) => a.group.localeCompare(b.group) || a.name.localeCompare(b.name));
 
   let widgetButtons = '';

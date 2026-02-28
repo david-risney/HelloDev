@@ -29,7 +29,7 @@ export class ClockWidget extends WidgetBase {
         key: 'style',
         label: 'Display Style',
         type: 'select',
-        options: ['Classic', 'Minimal', 'Compact', 'Digital', 'Analog', 'Modern'],
+        options: ['Classic', 'Digital', 'Analog', 'Modern', 'Flip'],
         default: 'Classic'
       }
     ];
@@ -38,34 +38,70 @@ export class ClockWidget extends WidgetBase {
   getContent() {
     const style = (this.data.style || 'Classic').toLowerCase();
     if (style === 'analog') {
-      // Generate hour markers
-      const markers = Array.from({length: 12}, (_, i) => 
-        `<div class="hour-marker${i % 3 === 0 ? ' major' : ''}" style="transform: rotate(${i * 30}deg)"></div>`
+      // Minute tick marks (60 total, major every 5 minutes)
+      const ticks = Array.from({length: 60}, (_, i) =>
+        `<div class="tick${i % 5 === 0 ? ' major' : ''}" style="transform:rotate(${i * 6}deg)"></div>`
       ).join('');
+      // Hour markers: pill + counter-rotated number
+      const hours = Array.from({length: 12}, (_, i) => {
+        const n = i + 1;
+        const angle = n * 30;
+        return `<div class="hour-mark" style="transform:rotate(${angle}deg)">` +
+          `<div class="hour-pill"></div>` +
+          `<div class="hour-num" style="transform:rotate(${-angle}deg)">${n}</div>` +
+          `</div>`;
+      }).join('');
       return `
         <div class="clock-display style-analog">
           <div class="analog-clock">
-            <div class="clock-face">
-              ${markers}
-              <div class="hand hour-hand"></div>
-              <div class="hand minute-hand"></div>
-              <div class="center-dot"></div>
-              <div class="clock-date"></div>
+            ${ticks}
+            ${hours}
+            <div class="hour-hand"></div>
+            <div class="minute-hand"></div>
+            <div class="center-ring"></div>
+            <div class="center-dot"></div>
+            <div class="clock-date"></div>
+          </div>
+        </div>
+      `;
+    }
+    if (style === 'flip') {
+      // Each digit group has cards for each possible value
+      const digitGroup = (prefix, count) => {
+        const cards = Array.from({length: count}, (_, i) => {
+          const d = String(i);
+          return `<div class="flip-card" data-digit="${d}">`
+            + `<div class="flip-top"><span>${d}</span></div>`
+            + `<div class="flip-bottom"><span>${d}</span></div>`
+            + `</div>`;
+        }).join('');
+        return `<div class="flip-group" data-group="${prefix}">${cards}</div>`;
+      };
+      return `
+        <div class="clock-display style-flip">
+          <div class="flip-clock">
+            <div class="flip-pair flip-hours">
+              ${digitGroup('h0', 3)}
+              ${digitGroup('h1', 10)}
+            </div>
+            <div class="flip-separator">:</div>
+            <div class="flip-pair flip-minutes">
+              ${digitGroup('m0', 6)}
+              ${digitGroup('m1', 10)}
             </div>
           </div>
+          <div class="flip-ampm"></div>
         </div>
       `;
     }
     if (style === 'modern') {
       return `
         <div class="clock-display style-modern">
-          <div class="modern-box time-box">
-            <div class="box-top"><span class="value hour">--</span></div>
-            <div class="box-bottom"><span class="value minute">--</span></div>
-          </div>
-          <div class="modern-box date-box">
-            <div class="box-top"><span class="value month">---</span></div>
-            <div class="box-bottom"><span class="value day">--</span></div>
+          <div class="flux-face">
+            <div class="flux-digit flux-h0">-</div>
+            <div class="flux-digit flux-h1">-</div>
+            <div class="flux-digit flux-m0">-</div>
+            <div class="flux-digit flux-m1">-</div>
           </div>
         </div>
       `;
@@ -114,13 +150,16 @@ export class ClockWidget extends WidgetBase {
     } else if (style === 'modern') {
       const clockDisplay = this.element?.querySelector('.clock-display');
       if (clockDisplay) {
-        // Determine layout based on aspect ratio
-        const isHorizontal = width >= height;
-        clockDisplay.classList.toggle('horizontal', isHorizontal);
-        clockDisplay.classList.toggle('vertical', !isHorizontal);
+        clockDisplay.style.setProperty('--flux-size', `${Math.min(width, height)}px`);
+      }
+    } else if (style === 'flip') {
+      const clockDisplay = this.element?.querySelector('.clock-display');
+      if (clockDisplay) {
+        const scale = Math.min(width / 320, height / 120);
+        clockDisplay.style.setProperty('--flip-scale', Math.max(0.4, scale));
       }
     } else {
-      // Classic, Minimal, Compact
+      // Classic
       const clockDisplay = this.element?.querySelector('.clock-display');
       if (clockDisplay) {
         // Scale based on container size
@@ -185,6 +224,12 @@ export class ClockWidget extends WidgetBase {
       this.updateModernClock(now);
       return;
     }
+
+    // Handle flip clock separately
+    if (style === 'flip') {
+      this.updateFlipClock(now);
+      return;
+    }
     
     const greetingEl = this.element?.querySelector('.greeting');
     const timeEl = this.element?.querySelector('.time');
@@ -218,19 +263,11 @@ export class ClockWidget extends WidgetBase {
     }
 
     if (dateEl) {
-      if (style === 'compact') {
-        // Compact style uses shorter date format
-        dateEl.textContent = now.toLocaleDateString([], {
-          month: 'short',
-          day: 'numeric'
-        });
-      } else {
-        dateEl.textContent = now.toLocaleDateString([], {
-          weekday: 'long',
-          month: 'long',
-          day: 'numeric'
-        });
-      }
+      dateEl.textContent = now.toLocaleDateString([], {
+        weekday: 'long',
+        month: 'long',
+        day: 'numeric'
+      });
     }
   }
 
@@ -260,23 +297,71 @@ export class ClockWidget extends WidgetBase {
     }
   }
 
+  // Flux-style size variations: each digit gets a different relative size
+  // to create the characteristic tightly-composed typographic layout.
+  // Indexed by digit value 0-9, values are scale factors.
+  static FLUX_SIZES = [
+    [1.0, 0.85, 0.72, 0.90],  // :x0 – h0,h1,m0,m1
+    [0.75, 0.65, 0.80, 0.95], // :x1
+    [0.90, 0.78, 1.0, 0.70],  // :x2
+    [0.82, 0.95, 0.68, 0.88], // :x3
+    [0.70, 1.0, 0.85, 0.75],  // :x4
+    [0.95, 0.72, 0.90, 0.80], // :x5
+    [0.78, 0.88, 0.75, 1.0],  // :x6
+    [1.0, 0.70, 0.82, 0.92],  // :x7
+    [0.85, 0.92, 1.0, 0.68],  // :x8
+    [0.72, 0.80, 0.95, 0.85], // :x9
+  ];
+
   updateModernClock(now) {
-    const hourEl = this.element?.querySelector('.value.hour');
-    const minuteEl = this.element?.querySelector('.value.minute');
-    const monthEl = this.element?.querySelector('.value.month');
-    const dayEl = this.element?.querySelector('.value.day');
-    
-    if (hourEl) {
-      hourEl.textContent = String(now.getHours()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const digits = [hours[0], hours[1], minutes[0], minutes[1]];
+    const classes = ['.flux-h0', '.flux-h1', '.flux-m0', '.flux-m1'];
+    const minute = now.getMinutes();
+    const sizes = ClockWidget.FLUX_SIZES[minute % 10];
+
+    for (let i = 0; i < 4; i++) {
+      const el = this.element?.querySelector(classes[i]);
+      if (el) {
+        el.textContent = digits[i];
+        el.style.fontSize = `calc(var(--flux-size) * ${sizes[i].toFixed(2)} * 0.46)`;
+      }
     }
-    if (minuteEl) {
-      minuteEl.textContent = String(now.getMinutes()).padStart(2, '0');
+  }
+
+  updateFlipClock(now) {
+    const h = now.getHours();
+    const m = now.getMinutes();
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const h12 = h % 12 || 12;
+    const hStr = String(h12).padStart(2, '0');
+    const mStr = String(m).padStart(2, '0');
+
+    const digits = { h0: hStr[0], h1: hStr[1], m0: mStr[0], m1: mStr[1] };
+
+    for (const [group, digit] of Object.entries(digits)) {
+      const groupEl = this.element?.querySelector(`.flip-group[data-group="${group}"]`);
+      if (!groupEl) continue;
+      for (const card of groupEl.querySelectorAll('.flip-card')) {
+        const d = card.dataset.digit;
+        const wasActive = card.classList.contains('active');
+        const isActive = d === digit;
+        if (isActive && !wasActive) {
+          // Mark previous active as outgoing
+          const prev = groupEl.querySelector('.flip-card.active');
+          if (prev) {
+            prev.classList.remove('active');
+            prev.classList.add('outgoing');
+            // Remove outgoing class after animation
+            setTimeout(() => prev.classList.remove('outgoing'), 500);
+          }
+          card.classList.add('active');
+        }
+      }
     }
-    if (monthEl) {
-      monthEl.textContent = now.toLocaleDateString([], { month: 'short' }).toUpperCase();
-    }
-    if (dayEl) {
-      dayEl.textContent = String(now.getDate()).padStart(2, '0');
-    }
+
+    const ampmEl = this.element?.querySelector('.flip-ampm');
+    if (ampmEl) ampmEl.textContent = ampm;
   }
 }

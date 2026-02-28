@@ -45,7 +45,7 @@ export class MarkdownHelper {
   static toMarkdown(element) {
     const lines = [];
     
-    const processNode = (node) => {
+    const processNode = (node, depth = 0) => {
       if (node.nodeType === Node.TEXT_NODE) {
         return node.textContent;
       }
@@ -55,7 +55,7 @@ export class MarkdownHelper {
       }
       
       const tag = node.tagName.toLowerCase();
-      const children = Array.from(node.childNodes).map(processNode).join('');
+      const children = Array.from(node.childNodes).map(c => processNode(c, depth)).join('');
       
       switch (tag) {
         case 'h1': return `# ${children}`;
@@ -83,7 +83,26 @@ export class MarkdownHelper {
         case 'ol':
           return Array.from(node.children).map((li, i) => {
             const prefix = tag === 'ol' ? `${i + 1}. ` : '- ';
-            return prefix + processNode(li);
+            const indent = '  '.repeat(depth);
+            
+            // Separate text content from nested lists
+            const textParts = [];
+            const nestedLists = [];
+            for (const child of li.childNodes) {
+              const childTag = child.nodeType === Node.ELEMENT_NODE
+                ? child.tagName.toLowerCase() : '';
+              if (childTag === 'ul' || childTag === 'ol') {
+                nestedLists.push(child);
+              } else {
+                textParts.push(processNode(child, depth));
+              }
+            }
+            
+            let result = indent + prefix + textParts.join('').trim();
+            for (const nested of nestedLists) {
+              result += '\n' + processNode(nested, depth + 1);
+            }
+            return result;
           }).join('\n');
         case 'p':
         case 'div':

@@ -162,6 +162,8 @@ describe('WidgetBase', () => {
       const el = widget.createElement(() => {}, () => {}, () => {});
 
       expect(el.querySelector('.drag-handle')).not.toBeNull();
+      expect(el.querySelector('.widget-control.minimize')).not.toBeNull();
+      expect(el.querySelector('.widget-control.maximize')).not.toBeNull();
       expect(el.querySelector('.widget-control.config')).not.toBeNull();
       expect(el.querySelector('.resize-handle')).not.toBeNull();
     });
