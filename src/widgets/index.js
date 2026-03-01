@@ -11,7 +11,7 @@ export { ChromiumBugsWidget } from './ChromiumBugsWidget.js';
 export { GitHubPRWidget } from './GitHubPRWidget.js';
 export { GitHubIssuesWidget } from './GitHubIssuesWidget.js';
 export { LinksWidget } from './LinksWidget.js';
-export { DevBoxWidget } from './DevBoxWidget.js';
+// export { DevBoxWidget } from './DevBoxWidget.js';
 
 import { WidgetBase } from './WidgetBase.js';
 import { ClockWidget } from './ClockWidget.js';
@@ -26,7 +26,7 @@ import { ChromiumBugsWidget } from './ChromiumBugsWidget.js';
 import { GitHubPRWidget } from './GitHubPRWidget.js';
 import { GitHubIssuesWidget } from './GitHubIssuesWidget.js';
 import { LinksWidget } from './LinksWidget.js';
-import { DevBoxWidget } from './DevBoxWidget.js';
+// import { DevBoxWidget } from './DevBoxWidget.js';
 
 // Widget factory - creates the appropriate widget class instance
 export const WidgetRegistry = {
@@ -41,8 +41,8 @@ export const WidgetRegistry = {
   chromiumbug: ChromiumBugsWidget,
   githubpr: GitHubPRWidget,
   githubissues: GitHubIssuesWidget,
-  links: LinksWidget,
-  devbox: DevBoxWidget
+  links: LinksWidget
+  // devbox: DevBoxWidget
 };
 
 export function createWidget(config) {

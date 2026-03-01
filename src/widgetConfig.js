@@ -108,6 +108,7 @@ function saveWidgetConfig(widget, dialog, { saveDashboard, closeWidgetConfig, re
   widget.zIndex = parseInt(dialog.querySelector('input[name="zIndex"]').value) || 0;
   widget.width = Math.max(1, parseInt(dialog.querySelector('input[name="width"]').value) || 1);
   widget.height = Math.max(1, parseInt(dialog.querySelector('input[name="height"]').value) || 1);
+  widget.minimized = false;
   widget.stretchFill = dialog.querySelector('input[name="stretchFill"]')?.checked || false;
 
   // Collect widget-specific config values

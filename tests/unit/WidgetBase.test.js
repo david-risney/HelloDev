@@ -52,6 +52,7 @@ describe('WidgetBase', () => {
         height: 5,
         zIndex: 10,
         stretchFill: false,
+        minimized: false,
         data: { foo: 'bar' }
       });
     });
@@ -127,6 +128,17 @@ describe('WidgetBase', () => {
       expect(widget.element.classList.contains('widget-stretch-fill')).toBe(false);
     });
 
+    it('uses height 1 when minimized', () => {
+      const widget = new WidgetBase({
+        ...baseConfig, stretchFill: false, x: 1, y: 2, width: 3, height: 4, minimized: true
+      });
+      widget.element = document.createElement('div');
+      widget.applyGridPosition();
+
+      expect(widget.element.style.gridRow).toBe('3 / span 1');
+      expect(widget.height).toBe(4); // original height preserved
+    });
+
     it('adds stretch-fill class when stretchFill is true', () => {
       const widget = new WidgetBase({ ...baseConfig, stretchFill: true });
       widget.element = document.createElement('div');
@@ -181,6 +193,47 @@ describe('WidgetBase', () => {
       const widget = new WidgetBase({ ...baseConfig, zIndex: 42 });
       const el = widget.createElement(() => {}, () => {}, () => {});
       expect(el.style.zIndex).toBe('42');
+    });
+  });
+
+  describe('toggleMinimize', () => {
+    it('toggles minimized state and preserves original height', () => {
+      const widget = new WidgetBase({ ...baseConfig, height: 5 });
+      widget.element = document.createElement('div');
+      widget.element.innerHTML = '<button class="widget-control minimize">▁</button>';
+
+      widget.toggleMinimize();
+      expect(widget.minimized).toBe(true);
+      expect(widget.height).toBe(5); // height not mutated
+      expect(widget.element.classList.contains('widget-minimized')).toBe(true);
+      expect(widget.element.style.gridRow).toBe('4 / span 1');
+
+      widget.toggleMinimize();
+      expect(widget.minimized).toBe(false);
+      expect(widget.height).toBe(5);
+      expect(widget.element.classList.contains('widget-minimized')).toBe(false);
+      expect(widget.element.style.gridRow).toBe('4 / span 5');
+    });
+
+    it('does nothing when element is null', () => {
+      const widget = new WidgetBase(baseConfig);
+      expect(() => widget.toggleMinimize()).not.toThrow();
+      expect(widget.minimized).toBe(false);
+    });
+
+    it('persists minimized state through toJSON round-trip', () => {
+      const widget = new WidgetBase({ ...baseConfig, height: 5 });
+      widget.element = document.createElement('div');
+      widget.element.innerHTML = '<button class="widget-control minimize">▁</button>';
+
+      widget.toggleMinimize();
+      const json = widget.toJSON();
+      expect(json.minimized).toBe(true);
+      expect(json.height).toBe(5); // original height preserved in serialization
+
+      const restored = new WidgetBase(json);
+      expect(restored.minimized).toBe(true);
+      expect(restored.height).toBe(5);
     });
   });
 

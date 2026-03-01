@@ -101,6 +101,7 @@ export class WidgetBase {
     this.height = config.height ?? 1;
     this.zIndex = config.zIndex ?? this.constructor.metadata?.defaultZIndex ?? 2;
     this.stretchFill = config.stretchFill ?? false;
+    this.minimized = config.minimized ?? false;
     this.data = config.data || {};
     this.element = null;
   }
@@ -180,13 +181,15 @@ export class WidgetBase {
     const el = this.element;
     if (!el) return;
 
+    const effectiveHeight = this.minimized ? 1 : this.height;
+
     if (this.stretchFill) {
       el.classList.add('widget-stretch-fill');
       // Grid placement is ignored when stretch-fill is active (uses absolute positioning)
     } else {
       el.classList.remove('widget-stretch-fill');
       el.style.gridColumn = `${this.x + 1} / span ${this.width}`;
-      el.style.gridRow = `${this.y + 1} / span ${this.height}`;
+      el.style.gridRow = `${this.y + 1} / span ${effectiveHeight}`;
     }
   }
 
@@ -295,31 +298,26 @@ export class WidgetBase {
   }
 
   /**
-   * Toggle the widget between normal height and height=1 (minimized/rolled-up).
+   * Toggle the widget between normal height and minimized (rolled-up) state.
+   * The minimized flag is persisted; the original height is never mutated.
    */
   toggleMinimize() {
     const el = this.element;
     if (!el) return;
 
-    if (this._minimizedFromHeight) {
-      // Restore to original height
-      this.height = this._minimizedFromHeight;
-      this._minimizedFromHeight = null;
-      el.classList.remove('widget-minimized');
-      this.applyGridPosition();
+    this.minimized = !this.minimized;
 
-      const btn = el.querySelector('.widget-control.minimize');
-      if (btn) { btn.textContent = '\u2581'; btn.title = 'Minimize'; }
-    } else {
-      // Minimize to height 1
-      this._minimizedFromHeight = this.height;
-      this.height = 1;
+    if (this.minimized) {
       el.classList.add('widget-minimized');
-      this.applyGridPosition();
-
       const btn = el.querySelector('.widget-control.minimize');
       if (btn) { btn.textContent = '\u25A3'; btn.title = 'Restore'; }
+    } else {
+      el.classList.remove('widget-minimized');
+      const btn = el.querySelector('.widget-control.minimize');
+      if (btn) { btn.textContent = '\u2581'; btn.title = 'Minimize'; }
     }
+
+    this.applyGridPosition();
   }
 
   /**
@@ -336,6 +334,7 @@ export class WidgetBase {
       height: this.height,
       zIndex: this.zIndex,
       stretchFill: this.stretchFill,
+      minimized: this.minimized,
       data: this.data
     };
   }
@@ -363,7 +362,7 @@ export class WidgetBase {
 
     el.innerHTML = `
       <button class="widget-control drag-handle" title="Drag to move">✥</button>
-      <button class="widget-control minimize" title="Minimize">▁</button>
+      <button class="widget-control minimize" title="${this.minimized ? 'Restore' : 'Minimize'}">${this.minimized ? '\u25A3' : '\u2581'}</button>
       <button class="widget-control maximize" title="Maximize">⛶</button>
       <button class="widget-control config" title="Configure">⚙</button>
       <button class="widget-control resize-handle" title="Drag to resize">⤢</button>
@@ -371,6 +370,10 @@ export class WidgetBase {
         ${this.getContent()}
       </div>
     `;
+
+    if (this.minimized) {
+      el.classList.add('widget-minimized');
+    }
 
     this.setupBehavior(el);
 

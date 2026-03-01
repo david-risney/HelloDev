@@ -480,6 +480,7 @@ function resizeWidget(id, newWidth, newHeight) {
   if (widget) {
     widget.width = newWidth;
     widget.height = newHeight;
+    widget.minimized = false;
     saveDashboard();
     renderDashboard();
   }
