@@ -187,6 +187,11 @@ export class DataWidgetBase extends WidgetBase {
     if (this.error && this.errorDialogOpen) {
       const errorMessage = this.escapeHtml(this.error.message || this.error);
       const errorDetails = this.error.details ? `<pre class="ado-widget-error-details">${this.escapeHtml(this.error.details)}</pre>` : '';
+      const rawMsg = (this.error.message || this.error.toString() || '') + (this.error.details || '');
+      const isNativeHostError = /native.?messaging.?host.?not.?found|native.?host|Specified native messaging host not found/i.test(rawMsg);
+      const nativeHostHint = isNativeHostError
+        ? '<p class="ado-widget-error-hint">The native messaging host is not installed. <a href="#action=setup">Set up the native host</a> to enable this widget.</p>'
+        : '';
       errorDialogHtml = `
         <div class="ado-widget-error-dialog">
           <div class="ado-widget-error-dialog-header">
@@ -194,6 +199,7 @@ export class DataWidgetBase extends WidgetBase {
             <button class="ado-widget-error-dialog-close" title="Close">✕</button>
           </div>
           <div class="ado-widget-error-dialog-content">
+            ${nativeHostHint}
             <p class="ado-widget-error-message">${errorMessage}</p>
             ${errorDetails}
           </div>

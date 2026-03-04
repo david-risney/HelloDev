@@ -12,7 +12,8 @@ import {
   showPackPromptFlyout,
   showCustomizeFlyout,
   showAboutFlyout,
-  showDataFlyout
+  showDataFlyout,
+  showSetupFlyout
 } from './flyouts.js';
 import { parseActionUrl, findPackByName } from './actionLinks.js';
 import { DEFAULT_STATE } from './defaultState.js';
@@ -40,6 +41,7 @@ const editToggle = document.getElementById('editToggle');
 const addWidgetBtn = document.getElementById('addWidgetBtn');
 const customizeBtn = document.getElementById('customizeBtn');
 const dataBtn = document.getElementById('dataBtn');
+const setupBtn = document.getElementById('setupBtn');
 const aboutBtn = document.getElementById('aboutBtn');
 
 // ============================================================================
@@ -49,7 +51,7 @@ const aboutBtn = document.getElementById('aboutBtn');
 document.addEventListener('DOMContentLoaded', init);
 
 async function init() {
-  initFlyouts({ addWidgetBtn, customizeBtn, dataBtn, aboutBtn });
+  initFlyouts({ addWidgetBtn, customizeBtn, dataBtn, setupBtn, aboutBtn });
   await loadDashboard();
   loadTheme(state);
   renderDashboard();
@@ -58,6 +60,9 @@ async function init() {
 
   // Handle action links (fragment URLs from markdown widgets)
   setupActionLinkHandler();
+
+  // Probe native host and auto-open setup flyout if not installed
+  checkNativeHostAndShowSetup();
 
   // Listen for state changes synced from other devices
   onSyncChanged((syncedState) => {
@@ -245,7 +250,38 @@ function handleAction({ action, params }) {
     case 'edit':
       // Edit mode is already activated above; nothing else to do.
       break;
+    case 'setup':
+      showSetupFlyout(setupBtn);
+      break;
   }
+}
+
+// ============================================================================
+// Native Host Detection
+// ============================================================================
+
+async function checkNativeHostAndShowSetup() {
+  // Check if user previously completed or dismissed setup
+  try {
+    const stored = await chrome.storage.local.get('nativeHostSetupDismissed');
+    if (stored.nativeHostSetupDismissed) return;
+  } catch (_) { /* continue */ }
+
+  // Probe the native host via the background service worker
+  try {
+    const result = await chrome.runtime.sendMessage({ type: 'PROBE_NATIVE_HOST' });
+    if (result && result.installed) return; // Native host is installed, nothing to do
+  } catch (_) {
+    // If sendMessage fails, the extension context may not be ready; skip
+    return;
+  }
+
+  // Native host is not installed — auto-open the setup flyout
+  // Activate edit mode so toolbar buttons are visible
+  if (!state.editMode) {
+    toggleEditMode();
+  }
+  showSetupFlyout(setupBtn);
 }
 
 // ============================================================================
@@ -314,6 +350,15 @@ function setupEventListeners() {
       showAboutFlyout();
     }
   });
+
+  setupBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (document.getElementById('setupFlyout')) {
+      closeAllFlyouts();
+    } else {
+      showSetupFlyout(setupBtn);
+    }
+  });
 }
 
 // ============================================================================
@@ -330,6 +375,7 @@ function toggleEditMode() {
   addWidgetBtn.classList.toggle('visible', state.editMode);
   customizeBtn.classList.toggle('visible', state.editMode);
   dataBtn.classList.toggle('visible', state.editMode);
+  setupBtn.classList.toggle('visible', state.editMode);
   aboutBtn.classList.toggle('visible', state.editMode);
 
   if (state.editMode) {

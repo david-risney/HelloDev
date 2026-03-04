@@ -177,7 +177,7 @@ export const WidgetPacks = [
           type: 'search',
           width: 4,
           height: 1,
-          data: { urlTemplate: props.searchEngine }
+          data: { searchTemplates: [{ name: 'Search', urlTemplate: props.searchEngine, placeholder: 'Search the web...' }] }
         },
         {
           type: 'markdown',

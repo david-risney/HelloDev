@@ -22,6 +22,7 @@ function handleOutsideClick(e) {
       !buttonEls.addWidgetBtn.contains(e.target) &&
       !buttonEls.customizeBtn.contains(e.target) &&
       !buttonEls.dataBtn.contains(e.target) &&
+      !buttonEls.setupBtn?.contains(e.target) &&
       !buttonEls.aboutBtn.contains(e.target)) {
     closeAllFlyouts();
   }
@@ -402,6 +403,128 @@ export async function showAboutFlyout() {
         </a>
       </div>
     `
+  });
+}
+
+// Show Native Host Setup flyout
+export function showSetupFlyout(parentEl) {
+  const extensionId = chrome.runtime?.id || 'nhfaibfkboppjdaiiaocmdkahcmglgbh';
+  const extArg = extensionId !== 'nhfaibfkboppjdaiiaocmdkahcmglgbh' ? ` -ExtensionId "${extensionId}"` : '';
+  const installCmd = `pwsh -ep Unrestricted -File $HOME\\Downloads\\hellodev-native-install.ps1${extArg}`;
+
+  createFlyout({
+    id: 'setupFlyout',
+    parentEl: parentEl || buttonEls.aboutBtn,
+    title: 'Native Host Setup',
+    dialogClass: 'setup-dialog',
+    contentHtml: `
+      <div class="setup-section">
+        <p class="setup-description">
+          The native host lets HelloDev get auth tokens from your local
+          <strong>Azure CLI</strong> and <strong>GitHub CLI</strong>, enabling
+          ADO and GitHub widgets.
+        </p>
+
+        <div class="setup-steps">
+          <div class="setup-step">
+            <div class="setup-step-header">
+              <span class="setup-step-number">1</span>
+              <span>Download the installer</span>
+            </div>
+            <button class="setup-download-btn" id="setupDownloadBtn">
+              <span>⬇️</span>
+              <span>Download install script</span>
+            </button>
+          </div>
+
+          <div class="setup-step">
+            <div class="setup-step-header">
+              <span class="setup-step-number">2</span>
+              <span>Run in PowerShell</span>
+            </div>
+            <div class="setup-command-block">
+              <code class="setup-command" id="setupCommand">${escapeHtml(installCmd)}</code>
+              <button class="setup-copy-btn" id="setupCopyBtn" title="Copy to clipboard">📋</button>
+            </div>
+          </div>
+
+          <div class="setup-step">
+            <div class="setup-step-header">
+              <span class="setup-step-number">3</span>
+              <span>Verify connection</span>
+            </div>
+            <button class="setup-verify-btn" id="setupVerifyBtn">
+              <span>Check Connection</span>
+            </button>
+            <span class="setup-verify-result" id="setupVerifyResult"></span>
+          </div>
+        </div>
+      </div>
+    `,
+    onSetup(flyout) {
+      // Step 1: Download the install script
+      flyout.querySelector('#setupDownloadBtn').addEventListener('click', () => {
+        chrome.downloads.download({
+          url: chrome.runtime.getURL('native-host/install.ps1'),
+          filename: 'hellodev-native-install.ps1',
+          saveAs: false
+        }, (downloadId) => {
+          const btn = flyout.querySelector('#setupDownloadBtn');
+          if (chrome.runtime.lastError) {
+            btn.innerHTML = '<span>❌</span><span>Download failed</span>';
+          } else {
+            btn.innerHTML = '<span>✅</span><span>Downloaded!</span>';
+          }
+        });
+      });
+
+      // Step 2: Copy command to clipboard
+      flyout.querySelector('#setupCopyBtn').addEventListener('click', async () => {
+        const command = flyout.querySelector('#setupCommand').textContent;
+        try {
+          await navigator.clipboard.writeText(command);
+          const btn = flyout.querySelector('#setupCopyBtn');
+          btn.textContent = '✅';
+          setTimeout(() => { btn.textContent = '📋'; }, 2000);
+        } catch (_) {
+          // Fallback: select the text
+          const range = document.createRange();
+          range.selectNodeContents(flyout.querySelector('#setupCommand'));
+          const selection = window.getSelection();
+          selection.removeAllRanges();
+          selection.addRange(range);
+        }
+      });
+
+      // Step 3: Verify native host connection
+      flyout.querySelector('#setupVerifyBtn').addEventListener('click', async () => {
+        const resultEl = flyout.querySelector('#setupVerifyResult');
+        const btn = flyout.querySelector('#setupVerifyBtn');
+        btn.disabled = true;
+        resultEl.textContent = 'Checking...';
+        resultEl.className = 'setup-verify-result';
+
+        try {
+          const result = await chrome.runtime.sendMessage({ type: 'PROBE_NATIVE_HOST' });
+          if (result && result.installed) {
+            resultEl.textContent = '✅ Connected!';
+            resultEl.classList.add('setup-verify-success');
+            // Mark as successfully set up so auto-open doesn't recur
+            try {
+              chrome.storage.local.set({ nativeHostSetupDismissed: true });
+            } catch (_) { /* best-effort */ }
+          } else {
+            resultEl.textContent = '❌ Not detected. Did you run the script?';
+            resultEl.classList.add('setup-verify-error');
+          }
+        } catch (err) {
+          resultEl.textContent = '❌ Check failed';
+          resultEl.classList.add('setup-verify-error');
+        }
+
+        btn.disabled = false;
+      });
+    }
   });
 }
 

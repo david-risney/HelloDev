@@ -38,6 +38,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     });
     return true;
   }
+
+  if (request.type === 'PROBE_NATIVE_HOST') {
+    console.log('[background] Probing native host availability...');
+    probeNativeHost().then(result => {
+      console.log('[background] Probe result:', result);
+      sendResponse(result);
+    });
+    return true;
+  }
 });
 
 // Timeout for native host responses (ms)
@@ -107,6 +116,61 @@ async function getNativeToken(hostName, resource) {
     } catch (error) {
       console.error('[background] Exception connecting to native host:', error);
       settle({ error: error.message });
+    }
+  });
+}
+
+// Lightweight probe: connect and send a ping to check if host is registered.
+// The host will respond with an error for the unknown action, which still
+// proves it is installed and reachable.
+const PROBE_TIMEOUT_MS = 3000;
+
+async function probeNativeHost() {
+  console.log('[background] probeNativeHost: starting probe...');
+  return new Promise((resolve) => {
+    let settled = false;
+
+    function settle(result) {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      console.log('[background] probeNativeHost: settled with', JSON.stringify(result));
+      resolve(result);
+    }
+
+    const timer = setTimeout(() => {
+      console.log('[background] probeNativeHost: timed out after', PROBE_TIMEOUT_MS, 'ms');
+      try { port.disconnect(); } catch (_) { /* ignore */ }
+      settle({ installed: false });
+    }, PROBE_TIMEOUT_MS);
+
+    let port;
+    try {
+      console.log('[background] probeNativeHost: connecting to', ADO_NATIVE_HOST_NAME);
+      port = chrome.runtime.connectNative(ADO_NATIVE_HOST_NAME);
+
+      port.onDisconnect.addListener(() => {
+        const error = chrome.runtime.lastError;
+        console.log('[background] probeNativeHost: onDisconnect, error:', error?.message || 'none');
+        if (error) {
+          settle({ installed: false });
+        } else {
+          settle({ installed: true });
+        }
+      });
+
+      port.onMessage.addListener((msg) => {
+        console.log('[background] probeNativeHost: onMessage received:', JSON.stringify(msg));
+        try { port.disconnect(); } catch (_) { /* ignore */ }
+        settle({ installed: true });
+      });
+
+      console.log('[background] probeNativeHost: sending ping message');
+      port.postMessage({ action: 'ping' });
+
+    } catch (error) {
+      console.error('[background] probeNativeHost: exception:', error.message);
+      settle({ installed: false });
     }
   });
 }

@@ -5,6 +5,7 @@
   "description": "A simple custom new tab page extension",
   "permissions": [
     "nativeMessaging",
+    "downloads",
     "identity",
     "storage",
     "topSites",
