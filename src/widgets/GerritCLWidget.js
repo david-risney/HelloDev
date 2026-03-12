@@ -27,6 +27,8 @@ export class GerritCLWidget extends DataWidgetBase {
     // Defaults
     this.data.gerritHost ??= 'https://chromium-review.googlesource.com';
     this.data.query ??= 'status:open';
+    this.data.ownerFilter ??= '';
+    this.data.reviewerFilter ??= '';
     this.data.authMode ??= 'anonymous';
     this.data.gitcookieToken ??= '';
     this.data.maxCount ??= 25;
@@ -84,6 +86,8 @@ export class GerritCLWidget extends DataWidgetBase {
         key: 'query', label: 'Search Query', type: 'string',
         default: 'status:open'
       },
+      { key: 'ownerFilter', label: 'Owner(s) (comma-separated, optional)', type: 'string', default: '' },
+      { key: 'reviewerFilter', label: 'Reviewer(s) (comma-separated, optional)', type: 'string', default: '' },
       {
         key: 'authMode', label: 'Authentication', type: 'select',
         options: [
@@ -152,11 +156,33 @@ export class GerritCLWidget extends DataWidgetBase {
   // Gerrit REST API
   // ---------------------------------------------------------------------------
 
+  buildQuery() {
+    let q = this.data.query || 'status:open';
+
+    const owners = (this.data.ownerFilter || '').split(',').map(s => s.trim()).filter(Boolean);
+    if (owners.length > 0) {
+      const ownerClause = owners.length === 1
+        ? `owner:${owners[0]}`
+        : `(${owners.map(o => `owner:${o}`).join(' OR ')})`;
+      q += ` ${ownerClause}`;
+    }
+
+    const reviewers = (this.data.reviewerFilter || '').split(',').map(s => s.trim()).filter(Boolean);
+    if (reviewers.length > 0) {
+      const reviewerClause = reviewers.length === 1
+        ? `reviewer:${reviewers[0]}`
+        : `(${reviewers.map(r => `reviewer:${r}`).join(' OR ')})`;
+      q += ` ${reviewerClause}`;
+    }
+
+    return q;
+  }
+
   async fetchChanges(authHeader) {
     const host = this.data.gerritHost.replace(/\/+$/, '');
     const prefix = authHeader ? '/a' : '';
     const params = new URLSearchParams({
-      q: this.data.query,
+      q: this.buildQuery(),
       n: String(this.data.maxCount || 25),
       o: 'DETAILED_LABELS',
     });

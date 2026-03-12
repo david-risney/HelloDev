@@ -56,7 +56,7 @@ export class ADOBugsWidget extends ADOWidgetBase {
       { key: 'workItemType', label: 'Work Item Type', type: 'string', default: 'Bug' },
       { key: 'state', label: 'State Filter (optional, e.g. Active)', type: 'string', default: '' },
       { key: 'areaPath', label: 'Area Path (optional)', type: 'string', default: '' },
-      { key: 'assignedTo', label: 'Assigned To (optional, email)', type: 'string', default: '' },
+      { key: 'assignedTo', label: 'Assigned To (email, name, or ID — optional)', type: 'string', default: '' },
       { key: 'severity', label: 'Severity (optional, e.g. 1 - Critical)', type: 'string', default: '' }
     ];
   }

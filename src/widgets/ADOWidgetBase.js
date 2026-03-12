@@ -253,6 +253,10 @@ export class ADOWidgetBase extends DataWidgetBase {
   // ADO user resolution
   // ---------------------------------------------------------------------------
 
+  isGuid(value) {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+  }
+
   async resolveUserId(emailOrName, accessToken) {
     if (!emailOrName) return null;
 
@@ -260,10 +264,17 @@ export class ADOWidgetBase extends DataWidgetBase {
       return this._userIdCache[emailOrName];
     }
 
-    const org = encodeURIComponent(this.data.organization);
-    const url = `https://vssps.dev.azure.com/${org}/_apis/graph/users?api-version=7.0-preview.1&subjectTypes=aad,msa&$top=10`;
+    // If the value is already a GUID, use it directly as an identity ID
+    if (this.isGuid(emailOrName)) {
+      this._userIdCache[emailOrName] = emailOrName;
+      return emailOrName;
+    }
 
+    const org = encodeURIComponent(this.data.organization);
+
+    // Search users via Graph API (top 10, client-side match)
     try {
+      const url = `https://vssps.dev.azure.com/${org}/_apis/graph/users?api-version=7.0-preview.1&subjectTypes=aad,msa&$top=10`;
       const response = await fetch(url, {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -271,31 +282,28 @@ export class ADOWidgetBase extends DataWidgetBase {
         }
       });
 
-      if (!response.ok) {
-        console.warn(`[${this.constructor.name}] Failed to search users: ${response.status}`);
-        return null;
+      if (response.ok) {
+        const data = await response.json();
+        const users = data.value || [];
+        const searchLower = emailOrName.toLowerCase();
+        const user = users.find(u =>
+          u.principalName?.toLowerCase() === searchLower ||
+          u.displayName?.toLowerCase() === searchLower ||
+          u.mailAddress?.toLowerCase() === searchLower
+        );
+
+        if (user) {
+          const userId = user.originId || user.descriptor;
+          this._userIdCache[emailOrName] = userId;
+          return userId;
+        }
       }
-
-      const data = await response.json();
-      const users = data.value || [];
-      const searchLower = emailOrName.toLowerCase();
-      const user = users.find(u =>
-        u.principalName?.toLowerCase() === searchLower ||
-        u.displayName?.toLowerCase() === searchLower ||
-        u.mailAddress?.toLowerCase() === searchLower
-      );
-
-      if (user) {
-        const userId = user.originId || user.descriptor;
-        this._userIdCache[emailOrName] = userId;
-        return userId;
-      }
-
-      return await this.resolveUserIdViaIdentities(emailOrName, accessToken);
     } catch (err) {
       console.warn(`[${this.constructor.name}] Error resolving user '${emailOrName}':`, err);
-      return null;
     }
+
+    // Fall back to the general identities API (searches users, groups, and teams)
+    return await this.resolveUserIdViaIdentities(emailOrName, accessToken);
   }
 
   async resolveUserIdViaIdentities(emailOrName, accessToken) {

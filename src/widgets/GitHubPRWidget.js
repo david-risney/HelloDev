@@ -104,7 +104,7 @@ export class GitHubPRWidget extends DataWidgetBase {
         default: 'open'
       },
       { key: 'baseBranch', label: 'Base Branch (optional)', type: 'string', default: '' },
-      { key: 'author', label: 'Author (optional)', type: 'string', default: '' },
+      { key: 'author', label: 'Author(s) (comma-separated, optional)', type: 'string', default: '' },
       { key: 'labels', label: 'Labels (comma-separated, optional)', type: 'string', default: '' },
       { key: 'maxCount', label: 'Max Results', type: 'number', default: 25 },
       { key: 'refreshInterval', label: 'Auto-Refresh (minutes, 0 = off)', type: 'number', default: 60 },
@@ -231,8 +231,13 @@ export class GitHubPRWidget extends DataWidgetBase {
 
     // Client-side author filter (GitHub API doesn't support this param directly)
     if (this.data.author) {
-      const author = this.data.author.toLowerCase();
-      items = items.filter(pr => pr.user?.login?.toLowerCase() === author);
+      const authors = this.data.author.split(',').map(a => a.trim().toLowerCase()).filter(Boolean);
+      if (authors.length > 0) {
+        items = items.filter(pr => {
+          const login = pr.user?.login?.toLowerCase();
+          return login && authors.includes(login);
+        });
+      }
     }
 
     // Client-side label filter

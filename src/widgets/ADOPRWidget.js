@@ -57,52 +57,79 @@ export class ADOPRWidget extends ADOWidgetBase {
         ],
         default: 'active'
       },
-      { key: 'creatorEmail', label: 'Creator Email (optional)', type: 'string', default: '' },
-      { key: 'reviewerEmail', label: 'Reviewer Email (optional)', type: 'string', default: '' },
+      { key: 'creatorEmail', label: 'Creator (email, name, or ID — comma-separated, optional)', type: 'string', default: '' },
+      { key: 'reviewerEmail', label: 'Reviewer (email, name, or ID — comma-separated, optional)', type: 'string', default: '' },
       { key: 'targetBranch', label: 'Target Branch (optional, e.g. main)', type: 'string', default: '' },
       { key: 'titleText', label: 'Title Contains (optional)', type: 'string', default: '' }
     ];
   }
 
+  parseEmailList(value) {
+    if (!value) return [];
+    return value.split(',').map(e => e.trim()).filter(Boolean);
+  }
+
   async fetchItems(accessToken) {
     let token = accessToken;
-    let creatorId = null;
-    let reviewerId = null;
 
-    if (this.data.creatorEmail) {
-      this.loadingStatus = 'Looking up creator...';
+    const creatorEmails = this.parseEmailList(this.data.creatorEmail);
+    const reviewerEmails = this.parseEmailList(this.data.reviewerEmail);
+
+    // Resolve all creator and reviewer emails to user IDs
+    const creatorIds = [];
+    for (const email of creatorEmails) {
+      this.loadingStatus = `Looking up creator: ${email}...`;
       this.updateContent();
-      creatorId = await this.resolveUserId(this.data.creatorEmail, token);
-      if (!creatorId) {
-        throw new Error(`Could not resolve creator email: ${this.data.creatorEmail}`);
-      }
+      const id = await this.resolveUserId(email, token);
+      if (!id) throw new Error(`Could not resolve creator: ${email}`);
+      creatorIds.push(id);
     }
 
-    if (this.data.reviewerEmail) {
-      this.loadingStatus = 'Looking up reviewer...';
+    const reviewerIds = [];
+    for (const email of reviewerEmails) {
+      this.loadingStatus = `Looking up reviewer: ${email}...`;
       this.updateContent();
-      reviewerId = await this.resolveUserId(this.data.reviewerEmail, token);
-      if (!reviewerId) {
-        throw new Error(`Could not resolve reviewer email: ${this.data.reviewerEmail}`);
-      }
+      const id = await this.resolveUserId(email, token);
+      if (!id) throw new Error(`Could not resolve reviewer: ${email}`);
+      reviewerIds.push(id);
     }
 
     this.loadingStatus = 'Fetching pull requests...';
     this.updateContent();
 
-    const { data, token: currentToken } = await this.adoFetch(
-      this.buildApiUrl(creatorId, reviewerId),
-      token
-    );
+    // Build all (creator, reviewer) combinations and fetch each
+    const creators = creatorIds.length > 0 ? creatorIds : [null];
+    const reviewers = reviewerIds.length > 0 ? reviewerIds : [null];
 
-    const items = (data.value || []).map(pr => ({
-      ...pr,
-      url: `https://dev.azure.com/${this.data.organization}/${this.data.project}/_git/${pr.repository?.name || ''}/pullrequest/${pr.pullRequestId}`
-    }));
+    const seen = new Set();
+    const allItems = [];
+    let currentToken = token;
 
-    await this.resolveIdentityAvatars(items.map(i => i.createdBy).filter(Boolean), currentToken);
+    for (const cId of creators) {
+      for (const rId of reviewers) {
+        const { data, token: t } = await this.adoFetch(
+          this.buildApiUrl(cId, rId),
+          currentToken
+        );
+        currentToken = t;
+        for (const pr of (data.value || [])) {
+          if (!seen.has(pr.pullRequestId)) {
+            seen.add(pr.pullRequestId);
+            allItems.push({
+              ...pr,
+              url: `https://dev.azure.com/${this.data.organization}/${this.data.project}/_git/${pr.repository?.name || ''}/pullrequest/${pr.pullRequestId}`
+            });
+          }
+        }
+      }
+    }
 
-    return items;
+    // Sort by creation date descending
+    allItems.sort((a, b) => new Date(b.creationDate) - new Date(a.creationDate));
+
+    await this.resolveIdentityAvatars(allItems.map(i => i.createdBy).filter(Boolean), currentToken);
+
+    return allItems;
   }
 
   buildApiUrl(creatorId, reviewerId) {
