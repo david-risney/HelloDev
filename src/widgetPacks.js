@@ -53,6 +53,16 @@ export const WidgetPacks = [
             authMode: props.authMode,
             title: `${props.repo} Issues`
           }
+        },
+        {
+          type: 'search',
+          width: 4,
+          height: 1,
+          data: {
+            searchTemplates: [
+              { name: 'Open GitHub Issue', urlTemplate: `https://github.com/${props.owner}/${props.repo}/issues/new?title={query}`, placeholder: 'Issue title' }
+            ]
+          }
         }
       ];
     }
@@ -102,6 +112,16 @@ export const WidgetPacks = [
             assignedTo: props.email,
             title: 'My Bugs'
           }
+        },
+        {
+          type: 'search',
+          width: 4,
+          height: 1,
+          data: {
+            searchTemplates: [
+              { name: 'Open ADO bug', urlTemplate: `https://dev.azure.com/${props.organization}/${props.project}/_workitems/create/Bug?[System.Title]={query}`, placeholder: 'Bug title' }
+            ]
+          }
         }
       ];
     }
@@ -142,6 +162,16 @@ export const WidgetPacks = [
           data: {
             query: `status:open assignee:${props.email}`,
             title: 'My Bugs'
+          }
+        },
+        {
+          type: 'search',
+          width: 4,
+          height: 1,
+          data: {
+            searchTemplates: [
+              { name: 'Open Chromium bug', urlTemplate: 'https://issues.chromium.org/issues/new?title={query}', placeholder: 'Bug title' }
+            ]
           }
         }
       ];
