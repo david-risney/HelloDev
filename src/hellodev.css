@@ -1196,15 +1196,6 @@ body {
   pointer-events: none;
 }
 
-/* AM/PM label */
-.widget-clock .flip-ampm {
-  font-size: calc(12px * var(--flip-scale));
-  font-weight: 600;
-  color: var(--text-secondary);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
 /* Clock Style: Analog – Apple Watch utility face inspired */
 .widget-clock .style-analog {
   display: flex;

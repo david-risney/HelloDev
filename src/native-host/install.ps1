@@ -1,11 +1,10 @@
 # HelloDev Native Host Installer (Self-Contained)
-# This script is bundled with the HelloDev browser extension.
-# It installs the native messaging hosts that let HelloDev get auth tokens
-# from your local Azure CLI and GitHub CLI.
+# This script installs the native messaging hosts that let HelloDev get
+# auth tokens from your local Azure CLI and GitHub CLI.
 #
 # Usage:
-#   & "$HOME\Downloads\hellodev-native-install.ps1"
-#   & "$HOME\Downloads\hellodev-native-install.ps1" -ExtensionId "your-extension-id"
+#   iex (irm 'https://raw.githubusercontent.com/david-risney/HelloDev/main/src/native-host/install.ps1')
+#   & ([scriptblock]::Create((irm 'https://raw.githubusercontent.com/david-risney/HelloDev/main/src/native-host/install.ps1'))) -ExtensionId "your-extension-id"
 
 param(
     [string]$ExtensionId = "nhfaibfkboppjdaiiaocmdkahcmglgbh"
@@ -468,11 +467,11 @@ if (-not $nodeVersion) {
             Write-Host "  Node.js $nodeVersion installed successfully!" -ForegroundColor Green
         } else {
             Write-Host "  Node.js installed but not in PATH. Please restart PowerShell and run this script again." -ForegroundColor Red
-            exit 1
+            return
         }
     } catch {
         Write-Host "  Failed to install Node.js via winget. Please install manually from https://nodejs.org" -ForegroundColor Red
-        exit 1
+        return
     }
 } else {
     Write-Host "  Node.js $nodeVersion is installed." -ForegroundColor Green
@@ -502,7 +501,7 @@ if (-not $azVersion) {
             Write-Host "  Azure CLI installed successfully!" -ForegroundColor Green
         } else {
             Write-Host "  Azure CLI installed but not in PATH. Please restart PowerShell and run this script again." -ForegroundColor Red
-            exit 1
+            return
         }
     } catch {
         Write-Host "  Failed to install Azure CLI via winget." -ForegroundColor Red
@@ -519,10 +518,10 @@ if (-not $azVersion) {
             Remove-Item $msiPath -Force -ErrorAction SilentlyContinue
             
             Write-Host "  Azure CLI installed. Please restart PowerShell and run this script again." -ForegroundColor Yellow
-            exit 0
+            return
         } catch {
             Write-Host "  Failed to install Azure CLI. Please install manually from https://aka.ms/installazurecliwindows" -ForegroundColor Red
-            exit 1
+            return
         }
     }
 } else {

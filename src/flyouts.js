@@ -409,8 +409,10 @@ export async function showAboutFlyout() {
 // Show Native Host Setup flyout
 export function showSetupFlyout(parentEl) {
   const extensionId = chrome.runtime?.id || 'nhfaibfkboppjdaiiaocmdkahcmglgbh';
-  const extArg = extensionId !== 'nhfaibfkboppjdaiiaocmdkahcmglgbh' ? ` -ExtensionId "${extensionId}"` : '';
-  const installCmd = `pwsh -ep Unrestricted -File $HOME\\Downloads\\hellodev-native-install.ps1${extArg}`;
+  const scriptUrl = 'https://raw.githubusercontent.com/david-risney/HelloDev/main/src/native-host/install.ps1';
+  const installCmd = extensionId !== 'nhfaibfkboppjdaiiaocmdkahcmglgbh'
+    ? `& ([scriptblock]::Create((irm '${scriptUrl}'))) -ExtensionId "${extensionId}"`
+    : `iex (irm '${scriptUrl}')`;
 
   createFlyout({
     id: 'setupFlyout',
@@ -429,17 +431,6 @@ export function showSetupFlyout(parentEl) {
           <div class="setup-step">
             <div class="setup-step-header">
               <span class="setup-step-number">1</span>
-              <span>Download the installer</span>
-            </div>
-            <button class="setup-download-btn" id="setupDownloadBtn">
-              <span>⬇️</span>
-              <span>Download install script</span>
-            </button>
-          </div>
-
-          <div class="setup-step">
-            <div class="setup-step-header">
-              <span class="setup-step-number">2</span>
               <span>Run in PowerShell</span>
             </div>
             <div class="setup-command-block">
@@ -450,7 +441,7 @@ export function showSetupFlyout(parentEl) {
 
           <div class="setup-step">
             <div class="setup-step-header">
-              <span class="setup-step-number">3</span>
+              <span class="setup-step-number">2</span>
               <span>Verify connection</span>
             </div>
             <button class="setup-verify-btn" id="setupVerifyBtn">
@@ -462,23 +453,7 @@ export function showSetupFlyout(parentEl) {
       </div>
     `,
     onSetup(flyout) {
-      // Step 1: Download the install script
-      flyout.querySelector('#setupDownloadBtn').addEventListener('click', () => {
-        chrome.downloads.download({
-          url: chrome.runtime.getURL('native-host/install.ps1'),
-          filename: 'hellodev-native-install.ps1',
-          saveAs: false
-        }, (downloadId) => {
-          const btn = flyout.querySelector('#setupDownloadBtn');
-          if (chrome.runtime.lastError) {
-            btn.innerHTML = '<span>❌</span><span>Download failed</span>';
-          } else {
-            btn.innerHTML = '<span>✅</span><span>Downloaded!</span>';
-          }
-        });
-      });
-
-      // Step 2: Copy command to clipboard
+      // Step 1: Copy command to clipboard
       flyout.querySelector('#setupCopyBtn').addEventListener('click', async () => {
         const command = flyout.querySelector('#setupCommand').textContent;
         try {

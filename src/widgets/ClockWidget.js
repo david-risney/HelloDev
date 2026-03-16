@@ -90,7 +90,6 @@ export class ClockWidget extends WidgetBase {
               ${digitGroup('m1', 10)}
             </div>
           </div>
-          <div class="flip-ampm"></div>
         </div>
       `;
     }
@@ -333,9 +332,7 @@ export class ClockWidget extends WidgetBase {
   updateFlipClock(now) {
     const h = now.getHours();
     const m = now.getMinutes();
-    const ampm = h >= 12 ? 'PM' : 'AM';
-    const h12 = h % 12 || 12;
-    const hStr = String(h12).padStart(2, '0');
+    const hStr = String(h).padStart(2, '0');
     const mStr = String(m).padStart(2, '0');
 
     const digits = { h0: hStr[0], h1: hStr[1], m0: mStr[0], m1: mStr[1] };
@@ -361,7 +358,5 @@ export class ClockWidget extends WidgetBase {
       }
     }
 
-    const ampmEl = this.element?.querySelector('.flip-ampm');
-    if (ampmEl) ampmEl.textContent = ampm;
   }
 }
