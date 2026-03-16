@@ -35,6 +35,7 @@ export class GerritCLWidget extends DataWidgetBase {
     this.data.refreshInterval ??= 60;
     this.data.title ??= '';
     this.data.maxAgeDays ??= 0;
+    this.data.sortBy ??= '';
 
     this.restoreFromCache();
   }
@@ -102,9 +103,29 @@ export class GerritCLWidget extends DataWidgetBase {
       },
       { key: 'maxCount', label: 'Max Results', type: 'number', default: 25 },
       { key: 'refreshInterval', label: 'Auto-Refresh (minutes, 0 = off)', type: 'number', default: 60 },
-      { key: 'maxAgeDays', label: 'Max Age (days, 0 = no limit)', type: 'number', default: 0 }
+      { key: 'maxAgeDays', label: 'Max Age (days, 0 = no limit)', type: 'number', default: 0 },
+      { key: 'sortBy', label: 'Sort By (comma-separated: updated, created, owner)', type: 'string', default: '' }
     ];
   }
+
+  getSortableColumns() {
+    return {
+      'updated': {
+        getValue: (item) => item.updated,
+        type: 'date'
+      },
+      'created': {
+        getValue: (item) => item.created,
+        type: 'date'
+      },
+      'owner': {
+        getValue: (item) => item.owner?.name || '',
+        type: 'string'
+      }
+    };
+  }
+
+  getDefaultSortColumn() { return 'updated'; }
 
   setConfig(values) {
     super.setConfig(values);

@@ -24,6 +24,7 @@ export class ChromiumBugsWidget extends DataWidgetBase {
     this.data.refreshInterval ??= 60;
     this.data.title ??= '';
     this.data.maxAgeDays ??= 0;
+    this.data.sortBy ??= '';
 
     this.restoreFromCache();
   }
@@ -60,9 +61,37 @@ export class ChromiumBugsWidget extends DataWidgetBase {
       { key: 'query', label: 'Issue Tracker Query', type: 'string', default: 'status:open' },
       { key: 'maxCount', label: 'Max Results', type: 'number', default: 25 },
       { key: 'refreshInterval', label: 'Auto-Refresh (minutes, 0 = off)', type: 'number', default: 60 },
-      { key: 'maxAgeDays', label: 'Max Age (days, 0 = no limit)', type: 'number', default: 0 }
+      { key: 'maxAgeDays', label: 'Max Age (days, 0 = no limit)', type: 'number', default: 0 },
+      { key: 'sortBy', label: 'Sort By (comma-separated: priority, status, assignee, modified time)', type: 'string', default: '' }
     ];
   }
+
+  getSortableColumns() {
+    return {
+      'priority': {
+        getValue: (item) => {
+          if (!item.priority) return Infinity;
+          const match = item.priority.match(/P(\d+)/i);
+          return match ? parseInt(match[1], 10) : Infinity;
+        },
+        type: 'numeric'
+      },
+      'status': {
+        getValue: (item) => item.status || '',
+        type: 'string'
+      },
+      'assignee': {
+        getValue: (item) => item.assignee || '',
+        type: 'string'
+      },
+      'modified time': {
+        getValue: (item) => item.modifiedTime,
+        type: 'date'
+      }
+    };
+  }
+
+  getDefaultSortColumn() { return 'modified time'; }
 
   setConfig(values) {
     super.setConfig(values);

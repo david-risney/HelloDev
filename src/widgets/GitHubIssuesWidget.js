@@ -39,6 +39,7 @@ export class GitHubIssuesWidget extends DataWidgetBase {
     this.data.refreshInterval ??= 60;
     this.data.title ??= '';
     this.data.maxAgeDays ??= 0;
+    this.data.sortBy ??= '';
 
     this.restoreFromCache();
   }
@@ -110,9 +111,34 @@ export class GitHubIssuesWidget extends DataWidgetBase {
       { key: 'milestone', label: 'Milestone (number or *, optional)', type: 'string', default: '' },
       { key: 'maxCount', label: 'Max Results', type: 'number', default: 25 },
       { key: 'refreshInterval', label: 'Auto-Refresh (minutes, 0 = off)', type: 'number', default: 60 },
-      { key: 'maxAgeDays', label: 'Max Age (days, 0 = no limit)', type: 'number', default: 0 }
+      { key: 'maxAgeDays', label: 'Max Age (days, 0 = no limit)', type: 'number', default: 0 },
+      { key: 'sortBy', label: 'Sort By (comma-separated: updated, created, author, comments)', type: 'string', default: '' }
     ];
   }
+
+  getSortableColumns() {
+    return {
+      'updated': {
+        getValue: (item) => item.updated_at,
+        type: 'date'
+      },
+      'created': {
+        getValue: (item) => item.created_at,
+        type: 'date'
+      },
+      'author': {
+        getValue: (item) => item.user?.login || '',
+        type: 'string'
+      },
+      'comments': {
+        getValue: (item) => item.comments || 0,
+        type: 'numeric',
+        descending: true
+      }
+    };
+  }
+
+  getDefaultSortColumn() { return 'updated'; }
 
   setConfig(values) {
     super.setConfig(values);

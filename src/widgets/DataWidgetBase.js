@@ -134,18 +134,99 @@ export class DataWidgetBase extends WidgetBase {
   }
 
   // ---------------------------------------------------------------------------
-  // Filtering
+  // Filtering & Sorting
   // ---------------------------------------------------------------------------
 
   getFilteredItems() {
-    if (!this.data.maxAgeDays || this.data.maxAgeDays <= 0) {
-      return this.items;
+    let items = this.items;
+
+    if (this.data.maxAgeDays && this.data.maxAgeDays > 0) {
+      const cutoffTime = Date.now() - this.data.maxAgeDays * 24 * 60 * 60 * 1000;
+      items = items.filter(item => {
+        const dateStr = this.getItemDateField(item);
+        if (!dateStr) return true;
+        return new Date(dateStr).getTime() >= cutoffTime;
+      });
     }
-    const cutoffTime = Date.now() - this.data.maxAgeDays * 24 * 60 * 60 * 1000;
-    return this.items.filter(item => {
-      const dateStr = this.getItemDateField(item);
-      if (!dateStr) return true;
-      return new Date(dateStr).getTime() >= cutoffTime;
+
+    return this.applySorting(items);
+  }
+
+  /**
+   * Return a map of sortable column definitions.
+   * Keys are lowercase column names; values are objects with:
+   *   - getValue(item): extract the comparable value
+   *   - type: 'date' | 'numeric' | 'string'
+   *   - descending (optional): override default direction
+   *     (dates default to descending; numeric/string default to ascending)
+   */
+  getSortableColumns() { return {}; }
+
+  /** Column name (key in getSortableColumns) used as the default sort. */
+  getDefaultSortColumn() { return null; }
+
+  /**
+   * Sort items according to `this.data.sortBy` (comma-separated column names).
+   * Falls back to the default sort column as a tiebreaker.
+   */
+  applySorting(items) {
+    if (items.length <= 1) return items;
+
+    const columns = this.getSortableColumns();
+    if (Object.keys(columns).length === 0) return items;
+
+    const sortByStr = (this.data.sortBy || '').trim();
+    const sortByNames = sortByStr
+      ? sortByStr.split(',').map(s => s.trim().toLowerCase()).filter(Boolean)
+      : [];
+
+    const sortOrder = [];
+    for (const name of sortByNames) {
+      const col = columns[name];
+      if (col) sortOrder.push(col);
+    }
+
+    // Always add the default column as a final tiebreaker
+    const defaultCol = this.getDefaultSortColumn();
+    if (defaultCol) {
+      const defaultDef = columns[defaultCol];
+      if (defaultDef && !sortOrder.includes(defaultDef)) {
+        sortOrder.push(defaultDef);
+      }
+    }
+
+    if (sortOrder.length === 0) return items;
+
+    return [...items].sort((a, b) => {
+      for (const col of sortOrder) {
+        const aVal = col.getValue(a);
+        const bVal = col.getValue(b);
+        let cmp;
+
+        switch (col.type) {
+          case 'date': {
+            const dateA = aVal ? new Date(aVal).getTime() : 0;
+            const dateB = bVal ? new Date(bVal).getTime() : 0;
+            cmp = dateA - dateB;
+            break;
+          }
+          case 'numeric': {
+            const numA = aVal ?? Infinity;
+            const numB = bVal ?? Infinity;
+            cmp = numA - numB;
+            break;
+          }
+          default: // string
+            cmp = (aVal || '').localeCompare(bVal || '');
+        }
+
+        // Default: dates descending, everything else ascending
+        const desc = col.descending ?? (col.type === 'date');
+        if (desc) cmp = -cmp;
+
+        if (cmp !== 0) return cmp;
+      }
+      return 0;
     });
   }
 

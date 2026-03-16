@@ -23,6 +23,7 @@ export class ADOPRWidget extends ADOWidgetBase {
     this.data.reviewerEmail ??= '';
     this.data.targetBranch ??= '';
     this.data.titleText ??= '';
+    this.data.sortBy ??= '';
   }
 
   getCachePrefix() { return 'adopr'; }
@@ -60,9 +61,25 @@ export class ADOPRWidget extends ADOWidgetBase {
       { key: 'creatorEmail', label: 'Creator (email, name, or ID — comma-separated, optional)', type: 'string', default: '' },
       { key: 'reviewerEmail', label: 'Reviewer (email, name, or ID — comma-separated, optional)', type: 'string', default: '' },
       { key: 'targetBranch', label: 'Target Branch (optional, e.g. main)', type: 'string', default: '' },
-      { key: 'titleText', label: 'Title Contains (optional)', type: 'string', default: '' }
+      { key: 'titleText', label: 'Title Contains (optional)', type: 'string', default: '' },
+      { key: 'sortBy', label: 'Sort By (comma-separated: creation date, creator)', type: 'string', default: '' }
     ];
   }
+
+  getSortableColumns() {
+    return {
+      'creation date': {
+        getValue: (item) => item.creationDate,
+        type: 'date'
+      },
+      'creator': {
+        getValue: (item) => item.createdBy?.displayName || '',
+        type: 'string'
+      }
+    };
+  }
+
+  getDefaultSortColumn() { return 'creation date'; }
 
   parseEmailList(value) {
     if (!value) return [];
@@ -123,9 +140,6 @@ export class ADOPRWidget extends ADOWidgetBase {
         }
       }
     }
-
-    // Sort by creation date descending
-    allItems.sort((a, b) => new Date(b.creationDate) - new Date(a.creationDate));
 
     await this.resolveIdentityAvatars(allItems.map(i => i.createdBy).filter(Boolean), currentToken);
 

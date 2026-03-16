@@ -128,6 +128,171 @@ describe('DataWidgetBase', () => {
     });
   });
 
+  describe('applySorting', () => {
+    // Widget with sortable columns for testing
+    class SortableWidget extends TestDataWidget {
+      getSortableColumns() {
+        return {
+          'priority': {
+            getValue: (item) => item.priority ?? Infinity,
+            type: 'numeric'
+          },
+          'name': {
+            getValue: (item) => item.name || '',
+            type: 'string'
+          },
+          'date': {
+            getValue: (item) => item.date,
+            type: 'date'
+          },
+          'score': {
+            getValue: (item) => item.score || 0,
+            type: 'numeric',
+            descending: true
+          }
+        };
+      }
+      getDefaultSortColumn() { return 'date'; }
+    }
+
+    let widget;
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-02-26T12:00:00Z'));
+      widget = new SortableWidget({ id: 'sort-1', data: {} });
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('sorts by default column (date descending) when sortBy is empty', () => {
+      widget.items = [
+        { name: 'old', date: '2026-02-20T12:00:00Z' },
+        { name: 'new', date: '2026-02-25T12:00:00Z' },
+        { name: 'mid', date: '2026-02-22T12:00:00Z' }
+      ];
+      const result = widget.getFilteredItems();
+      expect(result.map(i => i.name)).toEqual(['new', 'mid', 'old']);
+    });
+
+    it('sorts by a single numeric column ascending', () => {
+      widget.data.sortBy = 'priority';
+      widget.items = [
+        { name: 'low', priority: 3, date: '2026-02-25T12:00:00Z' },
+        { name: 'high', priority: 1, date: '2026-02-20T12:00:00Z' },
+        { name: 'med', priority: 2, date: '2026-02-22T12:00:00Z' }
+      ];
+      const result = widget.getFilteredItems();
+      expect(result.map(i => i.name)).toEqual(['high', 'med', 'low']);
+    });
+
+    it('sorts by priority then uses date as tiebreaker', () => {
+      widget.data.sortBy = 'priority';
+      widget.items = [
+        { name: 'p1-old', priority: 1, date: '2026-02-20T12:00:00Z' },
+        { name: 'p1-new', priority: 1, date: '2026-02-25T12:00:00Z' },
+        { name: 'p0', priority: 0, date: '2026-02-22T12:00:00Z' }
+      ];
+      const result = widget.getFilteredItems();
+      expect(result.map(i => i.name)).toEqual(['p0', 'p1-new', 'p1-old']);
+    });
+
+    it('sorts by multiple columns in order', () => {
+      widget.data.sortBy = 'priority, name';
+      widget.items = [
+        { name: 'Beta', priority: 1, date: '2026-02-25T12:00:00Z' },
+        { name: 'Alpha', priority: 1, date: '2026-02-24T12:00:00Z' },
+        { name: 'Charlie', priority: 0, date: '2026-02-20T12:00:00Z' }
+      ];
+      const result = widget.getFilteredItems();
+      expect(result.map(i => i.name)).toEqual(['Charlie', 'Alpha', 'Beta']);
+    });
+
+    it('sorts by string column ascending', () => {
+      widget.data.sortBy = 'name';
+      widget.items = [
+        { name: 'Charlie', date: '2026-02-25T12:00:00Z' },
+        { name: 'Alpha', date: '2026-02-24T12:00:00Z' },
+        { name: 'Beta', date: '2026-02-20T12:00:00Z' }
+      ];
+      const result = widget.getFilteredItems();
+      expect(result.map(i => i.name)).toEqual(['Alpha', 'Beta', 'Charlie']);
+    });
+
+    it('supports descending override for numeric columns', () => {
+      widget.data.sortBy = 'score';
+      widget.items = [
+        { name: 'low', score: 10, date: '2026-02-25T12:00:00Z' },
+        { name: 'high', score: 100, date: '2026-02-20T12:00:00Z' },
+        { name: 'med', score: 50, date: '2026-02-22T12:00:00Z' }
+      ];
+      const result = widget.getFilteredItems();
+      expect(result.map(i => i.name)).toEqual(['high', 'med', 'low']);
+    });
+
+    it('ignores unknown column names in sortBy', () => {
+      widget.data.sortBy = 'nonexistent, priority';
+      widget.items = [
+        { name: 'low', priority: 2, date: '2026-02-25T12:00:00Z' },
+        { name: 'high', priority: 1, date: '2026-02-20T12:00:00Z' }
+      ];
+      const result = widget.getFilteredItems();
+      expect(result.map(i => i.name)).toEqual(['high', 'low']);
+    });
+
+    it('is case-insensitive for column names', () => {
+      widget.data.sortBy = 'Priority';
+      widget.items = [
+        { name: 'low', priority: 2, date: '2026-02-25T12:00:00Z' },
+        { name: 'high', priority: 1, date: '2026-02-20T12:00:00Z' }
+      ];
+      const result = widget.getFilteredItems();
+      expect(result.map(i => i.name)).toEqual(['high', 'low']);
+    });
+
+    it('handles null values in numeric sort (nulls last)', () => {
+      widget.data.sortBy = 'priority';
+      widget.items = [
+        { name: 'none', date: '2026-02-25T12:00:00Z' },
+        { name: 'high', priority: 1, date: '2026-02-20T12:00:00Z' }
+      ];
+      const result = widget.getFilteredItems();
+      expect(result.map(i => i.name)).toEqual(['high', 'none']);
+    });
+
+    it('does not modify the original items array', () => {
+      widget.data.sortBy = 'priority';
+      widget.items = [
+        { name: 'low', priority: 2, date: '2026-02-25T12:00:00Z' },
+        { name: 'high', priority: 1, date: '2026-02-20T12:00:00Z' }
+      ];
+      widget.getFilteredItems();
+      expect(widget.items[0].name).toBe('low');
+    });
+
+    it('returns items as-is for 0 or 1 items', () => {
+      widget.data.sortBy = 'priority';
+      widget.items = [{ name: 'only', priority: 1, date: '2026-02-25T12:00:00Z' }];
+      const result = widget.getFilteredItems();
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe('only');
+    });
+
+    it('applies filtering before sorting', () => {
+      widget.data.maxAgeDays = 7;
+      widget.data.sortBy = 'priority';
+      widget.items = [
+        { name: 'recent-low', priority: 2, date: '2026-02-25T12:00:00Z' },
+        { name: 'old-high', priority: 0, date: '2026-02-01T12:00:00Z' },
+        { name: 'recent-high', priority: 1, date: '2026-02-24T12:00:00Z' }
+      ];
+      const result = widget.getFilteredItems();
+      expect(result.map(i => i.name)).toEqual(['recent-high', 'recent-low']);
+    });
+  });
+
   describe('buildRefreshError', () => {
     let widget;
 

@@ -25,6 +25,7 @@ export class ADOBugsWidget extends ADOWidgetBase {
     this.data.areaPath ??= '';
     this.data.assignedTo ??= '';
     this.data.severity ??= '';
+    this.data.sortBy ??= '';
   }
 
   getCachePrefix() { return 'adobugs'; }
@@ -57,9 +58,41 @@ export class ADOBugsWidget extends ADOWidgetBase {
       { key: 'state', label: 'State Filter (optional, e.g. Active)', type: 'string', default: '' },
       { key: 'areaPath', label: 'Area Path (optional)', type: 'string', default: '' },
       { key: 'assignedTo', label: 'Assigned To (email, name, or ID — optional)', type: 'string', default: '' },
-      { key: 'severity', label: 'Severity (optional, e.g. 1 - Critical)', type: 'string', default: '' }
+      { key: 'severity', label: 'Severity (optional, e.g. 1 - Critical)', type: 'string', default: '' },
+      { key: 'sortBy', label: 'Sort By (comma-separated: severity, state, assigned to, created date, changed date)', type: 'string', default: '' }
     ];
   }
+
+  getSortableColumns() {
+    return {
+      'severity': {
+        getValue: (item) => {
+          if (!item.severity) return Infinity;
+          const match = item.severity.match(/^(\d+)/);
+          return match ? parseInt(match[1], 10) : Infinity;
+        },
+        type: 'numeric'
+      },
+      'state': {
+        getValue: (item) => item.state || '',
+        type: 'string'
+      },
+      'assigned to': {
+        getValue: (item) => item.assignedTo?.displayName || '',
+        type: 'string'
+      },
+      'created date': {
+        getValue: (item) => item.createdDate,
+        type: 'date'
+      },
+      'changed date': {
+        getValue: (item) => item.changedDate,
+        type: 'date'
+      }
+    };
+  }
+
+  getDefaultSortColumn() { return 'created date'; }
 
   async fetchItems(accessToken) {
     const org = encodeURIComponent(this.data.organization);
