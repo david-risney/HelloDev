@@ -66,6 +66,9 @@ async function init() {
 
   // Listen for state changes synced from other devices
   onSyncChanged((syncedState) => {
+    console.log('[sync] Live update received from another device/tab,',
+      `lastModified=${syncedState.lastModified ?? 'none'},`,
+      `widgets=${syncedState.widgets?.length ?? 0}`);
     applyLoadedState(syncedState);
     // Update localStorage to match
     try {
@@ -108,14 +111,14 @@ function applyLoadedState(loaded) {
 
 async function loadDashboard() {
   const stored = localStorage.getItem(STORAGE_KEY);
-  let loaded = null;
+  let local = null;
 
   if (stored) {
     try {
       const parsed = JSON.parse(stored);
       if (parsed && typeof parsed === 'object' && 'version' in parsed) {
         if (parsed.version === STORAGE_VERSION) {
-          loaded = parsed;
+          local = parsed;
         } else {
           console.warn(`Incompatible saved state version ${parsed.version}, expected ${STORAGE_VERSION}. Using defaults.`);
         }
@@ -124,9 +127,37 @@ async function loadDashboard() {
       console.error('Failed to load dashboard:', e);
       showStorageError('Could not load saved dashboard. Using defaults.');
     }
+  }
+
+  // Always check sync storage so we pick up changes from other devices
+  const synced = await loadFromSync();
+
+  let loaded = null;
+  if (local && synced) {
+    const localTime = local.lastModified || 0;
+    const syncTime = synced.lastModified || 0;
+    console.log(
+      `[sync] Comparing local (lastModified=${localTime}) vs sync (lastModified=${syncTime})`
+    );
+    if (syncTime > localTime) {
+      console.log('[sync] Using synced state (newer)');
+      loaded = synced;
+      // Update localStorage to match the newer synced state
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(synced));
+      } catch (_) { /* best-effort */ }
+    } else {
+      console.log('[sync] Using local state (newer or equal)');
+      loaded = local;
+    }
+  } else if (synced) {
+    console.log('[sync] No local data — using synced state');
+    loaded = synced;
+  } else if (local) {
+    console.log('[sync] No synced data — using local state');
+    loaded = local;
   } else {
-    // No local data — try loading from sync storage (e.g. new device)
-    loaded = await loadFromSync();
+    console.log('[sync] No local or synced data — using defaults');
   }
 
   // Migrate legacy theme from separate storage key
@@ -163,7 +194,8 @@ const saveDashboard = (() => {
       widgets: state.widgets.map(w => w.toJSON()),
       colorPrimary: state.currentTheme.colorPrimary,
       colorAccent: state.currentTheme.colorAccent,
-      themeMode: state.themeMode
+      themeMode: state.themeMode,
+      lastModified: Date.now()
     };
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
