@@ -117,11 +117,22 @@ export class ClockWidget extends WidgetBase {
   setupBehavior(element) {
     // Update immediately, then every second
     this.updateClock();
-    this.updateClockSize();
     this.intervalId = setInterval(() => this.updateClock(), 1000);
     
-    // Watch for size changes
-    this.resizeObserver = new ResizeObserver(() => this.updateClockSize());
+    // Watch for size changes (debounced to avoid excessive recalculations).
+    // Defer the initial size calculation to the next frame to avoid a forced
+    // reflow when setupBehavior is called from an IntersectionObserver.
+    this._resizeRAF = requestAnimationFrame(() => {
+      this._resizeRAF = null;
+      this.updateClockSize();
+    });
+    this.resizeObserver = new ResizeObserver(() => {
+      if (this._resizeRAF) cancelAnimationFrame(this._resizeRAF);
+      this._resizeRAF = requestAnimationFrame(() => {
+        this._resizeRAF = null;
+        this.updateClockSize();
+      });
+    });
     this.resizeObserver.observe(element);
   }
 
@@ -172,6 +183,10 @@ export class ClockWidget extends WidgetBase {
     if (this.intervalId) {
       clearInterval(this.intervalId);
       this.intervalId = null;
+    }
+    if (this._resizeRAF) {
+      cancelAnimationFrame(this._resizeRAF);
+      this._resizeRAF = null;
     }
     if (this.resizeObserver) {
       this.resizeObserver.disconnect();

@@ -193,7 +193,7 @@ export class ADOPRWidget extends ADOWidgetBase {
 
     return `
       <li class="ado-widget-item ${statusClass}">
-        <a href="${pr.url}" target="_blank" class="ado-widget-link">
+        <a href="${pr.url}" target="_blank" class="ado-widget-link" title="${this.escapeHtml(pr.title)}">
           <div class="ado-widget-avatar-container">
             ${avatarHtml}
           </div>

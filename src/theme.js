@@ -43,14 +43,20 @@ export function saveTheme(state, theme) {
   applyTheme(theme, state.themeMode);
 }
 
+// Track whether we've already registered the OS theme listener
+let osThemeListenerRegistered = false;
+
 // Apply theme from state (called during init after unified state is loaded)
 export function loadTheme(state) {
   applyTheme(state.currentTheme, state.themeMode);
 
-  // Listen for OS theme changes when in auto mode
-  osPrefersDark.addEventListener('change', () => {
-    if (state.themeMode === 'auto') {
-      applyTheme(state.currentTheme, state.themeMode);
-    }
-  });
+  // Listen for OS theme changes when in auto mode (register only once)
+  if (!osThemeListenerRegistered) {
+    osThemeListenerRegistered = true;
+    osPrefersDark.addEventListener('change', () => {
+      if (state.themeMode === 'auto') {
+        applyTheme(state.currentTheme, state.themeMode);
+      }
+    });
+  }
 }

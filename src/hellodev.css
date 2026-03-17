@@ -53,6 +53,8 @@ body {
   justify-content: space-between;
   align-items: center;
   padding: 1rem 2rem;
+  height: 60px;
+  box-sizing: border-box;
   background: var(--bg-secondary);
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   position: relative;
@@ -667,6 +669,7 @@ body {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  contain: layout style;
 }
 
 .widget .widget-content {
@@ -814,12 +817,14 @@ body {
   z-index: 100;
 }
 
-/* Maximized widget - stretched to max grid size with high z-order */
+/* Maximized widget - fixed overlay that fills the viewport */
 .widget-maximized {
-  grid-column: 1 / -1 !important;
-  grid-row: 1 / span 100 !important;
+  position: fixed !important;
+  top: 60px !important;
+  left: 1rem !important;
+  width: calc(100vw - 2rem) !important;
+  height: calc(100vh - 60px - 2rem) !important;
   z-index: 10000 !important;
-  max-height: calc(100vh - 60px - 2rem) !important;
 }
 
 /* Show maximize control in maximized state even without edit mode */

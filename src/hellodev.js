@@ -50,6 +50,35 @@ const aboutBtn = document.getElementById('aboutBtn');
 
 document.addEventListener('DOMContentLoaded', init);
 
+// Pre-size dashboard grid and apply theme from localStorage before first paint.
+// This runs synchronously when the module is evaluated (before DOMContentLoaded)
+// to minimize layout shifts from the grid filling in.
+(function preSizeGrid() {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (!stored) return;
+    const data = JSON.parse(stored);
+    if (!data || !Array.isArray(data.widgets)) return;
+
+    const nonStretch = data.widgets.filter(w => !w.stretchFill);
+    if (nonStretch.length > 0) {
+      let maxRow = 0;
+      for (const w of nonStretch) {
+        const r = w.y + (w.minimized ? 1 : w.height);
+        if (r > maxRow) maxRow = r;
+      }
+      dashboard.style.gridTemplateRows = `repeat(${maxRow}, var(--grid-cell-size))`;
+    }
+
+    // Apply theme early to avoid FOUC
+    if (data.colorPrimary) document.documentElement.style.setProperty('--color-primary', data.colorPrimary);
+    if (data.colorAccent) document.documentElement.style.setProperty('--color-accent', data.colorAccent);
+    const isLight = data.themeMode === 'light' ||
+      (data.themeMode === 'auto' && matchMedia('(prefers-color-scheme: light)').matches);
+    document.body.classList.toggle('light-mode', isLight);
+  } catch (_) { /* best-effort */ }
+})();
+
 async function init() {
   initFlyouts({ addWidgetBtn, customizeBtn, dataBtn, setupBtn, aboutBtn });
   await loadDashboard();
@@ -426,10 +455,18 @@ function toggleEditMode() {
 // Dashboard Rendering
 // ============================================================================
 
+function destroyAllWidgets() {
+  for (const widget of state.widgets) {
+    if (widget.destroy) widget.destroy();
+  }
+}
+
 function renderDashboard() {
+  destroyAllWidgets();
   dashboard.innerHTML = '';
 
   if (state.widgets.length === 0) {
+    dashboard.style.gridTemplateRows = '';
     dashboard.innerHTML = `
       <div class="dashboard-empty">
         <div class="dashboard-empty-icon">\ud83d\udce6</div>
@@ -439,12 +476,24 @@ function renderDashboard() {
     return;
   }
 
+  // Pre-size the grid to avoid CLS: compute the row count needed from the
+  // widget layout and set explicit grid-template-rows before inserting DOM.
+  const nonStretch = state.widgets.filter(w => !w.stretchFill);
+  if (nonStretch.length > 0) {
+    const maxRow = Math.max(...nonStretch.map(w => w.y + (w.minimized ? 1 : w.height)));
+    dashboard.style.gridTemplateRows = `repeat(${maxRow}, var(--grid-cell-size))`;
+  }
+
+  const fragment = document.createDocumentFragment();
+
   state.widgets.forEach(widget => {
     const el = widget.createElement(removeWidget, resizeWidget, openWidgetConfig);
     const dragHandle = el.querySelector('.widget-control.drag-handle');
     setupWidgetDrag(dragHandle, el, widget, dashboard, state, moveWidget);
-    dashboard.appendChild(el);
+    fragment.appendChild(el);
   });
+
+  dashboard.appendChild(fragment);
 
   // Recalculate stretch-fill widgets now that elements are in the DOM
   updateStretchFillWidgets();
@@ -459,8 +508,9 @@ function moveWidget(id, newX, newY) {
   if (widget) {
     widget.x = newX;
     widget.y = newY;
+    widget.applyGridPosition();
     saveDashboard();
-    renderDashboard();
+    updateStretchFillWidgets();
   }
 }
 
@@ -558,9 +608,15 @@ function resizeWidget(id, newWidth, newHeight) {
   if (widget) {
     widget.width = newWidth;
     widget.height = newHeight;
-    widget.minimized = false;
+    if (widget.minimized) {
+      widget.minimized = false;
+      widget.element?.classList.remove('widget-minimized');
+      const btn = widget.element?.querySelector('.widget-control.minimize');
+      if (btn) { btn.textContent = '\u2581'; btn.title = 'Minimize'; }
+    }
+    widget.applyGridPosition();
     saveDashboard();
-    renderDashboard();
+    updateStretchFillWidgets();
   }
 }
 

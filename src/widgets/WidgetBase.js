@@ -215,6 +215,10 @@ export class WidgetBase {
    */
   destroy() {
     this.restoreFromMaximize();
+    if (this._setupObserver) {
+      this._setupObserver.disconnect();
+      this._setupObserver = null;
+    }
     // Override in subclasses that need cleanup
   }
 
@@ -375,7 +379,22 @@ export class WidgetBase {
       el.classList.add('widget-minimized');
     }
 
-    this.setupBehavior(el);
+    // Defer setupBehavior until the widget is near the viewport.
+    // Widgets already visible get set up immediately via the observer;
+    // off-screen widgets defer their data fetching and timers.
+    this._deferredSetup = true;
+    this._setupObserver = new IntersectionObserver((entries, obs) => {
+      for (const entry of entries) {
+        if (entry.isIntersecting) {
+          obs.disconnect();
+          this._setupObserver = null;
+          this._deferredSetup = false;
+          this.setupBehavior(el);
+          break;
+        }
+      }
+    }, { rootMargin: '200px' });
+    this._setupObserver.observe(el);
 
     // Setup control buttons
     el.querySelector('.widget-control.minimize').addEventListener('click', (e) => {

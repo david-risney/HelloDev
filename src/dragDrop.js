@@ -2,10 +2,8 @@
 
 import { GRID_CELL_SIZE, GRID_GAP, DASHBOARD_PADDING } from './constants.js';
 
-// Calculate grid position from client coordinates relative to the dashboard
-export function getGridPosition(dashboardEl, clientX, clientY) {
-  const rect = dashboardEl.getBoundingClientRect();
-
+// Calculate grid position from a pre-computed bounding rect
+function getGridPositionFromRect(rect, clientX, clientY) {
   const relativeX = clientX - rect.left - DASHBOARD_PADDING;
   const relativeY = clientY - rect.top - DASHBOARD_PADDING;
 
@@ -13,6 +11,12 @@ export function getGridPosition(dashboardEl, clientX, clientY) {
   const y = Math.max(0, Math.floor(relativeY / (GRID_CELL_SIZE + GRID_GAP)));
 
   return { x, y };
+}
+
+// Calculate grid position from client coordinates relative to the dashboard
+export function getGridPosition(dashboardEl, clientX, clientY) {
+  const rect = dashboardEl.getBoundingClientRect();
+  return getGridPositionFromRect(rect, clientX, clientY);
 }
 
 // Show or update the drop indicator at a grid position with given dimensions
@@ -47,8 +51,11 @@ export function setupWidgetDrag(dragHandle, widgetEl, widget, dashboardEl, state
     dragHandle.setPointerCapture(e.pointerId);
     widgetEl.classList.add('dragging');
 
+    // Cache the bounding rect once at drag start to avoid layout thrashing
+    const cachedRect = dashboardEl.getBoundingClientRect();
+
     const onPointerMove = (moveEvent) => {
-      const pos = getGridPosition(dashboardEl, moveEvent.clientX, moveEvent.clientY);
+      const pos = getGridPositionFromRect(cachedRect, moveEvent.clientX, moveEvent.clientY);
       updateDropIndicator(dashboardEl, pos.x, pos.y, widget.width, widget.height);
     };
 
@@ -58,7 +65,7 @@ export function setupWidgetDrag(dragHandle, widgetEl, widget, dashboardEl, state
       widgetEl.classList.remove('dragging');
       removeDropIndicator(dashboardEl);
 
-      const pos = getGridPosition(dashboardEl, upEvent.clientX, upEvent.clientY);
+      const pos = getGridPositionFromRect(cachedRect, upEvent.clientX, upEvent.clientY);
       if (pos.x !== widget.x || pos.y !== widget.y) {
         moveWidget(widget.id, pos.x, pos.y);
       }
