@@ -547,7 +547,7 @@ function findNextPosition(newWidth, newHeight, newZIndex) {
 }
 
 function addWidget(type) {
-  const id = `widget-${Date.now()}`;
+  const id = `widget-${crypto.randomUUID()}`;
   const WidgetClass = WidgetRegistry[type];
 
   const existingWidgetsOfType = state.widgets.filter(w => w.type === type);
@@ -579,7 +579,7 @@ function addWidget(type) {
 
 function addWidgetPack(widgetConfigs) {
   for (const cfg of widgetConfigs) {
-    const id = `widget-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const id = `widget-${crypto.randomUUID()}`;
     const WidgetClass = WidgetRegistry[cfg.type];
     const width = cfg.width ?? WidgetClass?.metadata?.defaultSize?.width ?? 2;
     const height = cfg.height ?? WidgetClass?.metadata?.defaultSize?.height ?? 2;

@@ -331,7 +331,8 @@ export class GitHubPRWidget extends DataWidgetBase {
     const shown = labels.slice(0, 3);
     return shown.map(label => {
       const name = this.escapeHtml(label.name);
-      const color = label.color ? `#${label.color}` : 'var(--accent)';
+      const color = label.color && /^[0-9a-fA-F]{6}$/.test(label.color)
+        ? `#${label.color}` : 'var(--accent)';
       return `<span class="github-pr-label" style="background:${color}" title="${name}">${name}</span>`;
     }).join('');
   }

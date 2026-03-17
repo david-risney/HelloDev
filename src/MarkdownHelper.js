@@ -232,6 +232,16 @@ export class MarkdownHelper {
       
       // Links — fragment-only URLs stay in-page; others open in a new tab
       .replace(/\[(.+?)\]\((.+?)\)/g, (_match, text, url) => {
+        if (!url.startsWith('#') && !url.startsWith('mailto:')) {
+          try {
+            const parsed = new URL(url, 'https://placeholder');
+            if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+              return text;
+            }
+          } catch {
+            return text;
+          }
+        }
         const attrs = url.startsWith('#') ? '' : ' target="_blank"';
         return `<a href="${url}"${attrs}>${text}</a>`;
       });

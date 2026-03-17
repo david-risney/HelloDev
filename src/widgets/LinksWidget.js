@@ -254,8 +254,7 @@ export class LinksWidget extends WidgetBase {
       return `
         <a class="topsites-tile" href="${href}" title="${title}">
           <div class="topsites-favicon">
-            <img src="${favicon}" alt="" width="24" height="24"
-                 onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+            <img src="${favicon}" alt="" width="24" height="24" class="topsites-favicon-img">
             <span class="topsites-favicon-fallback">${this.getInitial(title)}</span>
           </div>
           <span class="topsites-label">${title}</span>
@@ -289,6 +288,15 @@ export class LinksWidget extends WidgetBase {
         this.refresh();
       }
     });
+
+    // Handle favicon load errors via delegation instead of inline onerror
+    element.addEventListener('error', (e) => {
+      if (e.target.classList.contains('topsites-favicon-img')) {
+        e.target.style.display = 'none';
+        const fallback = e.target.nextElementSibling;
+        if (fallback) fallback.style.display = 'flex';
+      }
+    }, true);
 
     this.refresh();
     // Refresh every 5 minutes to pick up new browsing activity

@@ -26,6 +26,15 @@ export class FrameWidget extends WidgetBase {
     ];
   }
 
+  static isSafeUrl(url) {
+    try {
+      const parsed = new URL(url);
+      return parsed.protocol === 'https:' || parsed.protocol === 'http:';
+    } catch {
+      return false;
+    }
+  }
+
   getContent() {
     const url = this.data.url || '';
     if (!url) {
@@ -36,14 +45,23 @@ export class FrameWidget extends WidgetBase {
         </div>
       `;
     }
+    if (!FrameWidget.isSafeUrl(url)) {
+      return `
+        <div class="widget-frame-empty">
+          <div class="widget-frame-icon">⚠️</div>
+          <div>Invalid URL — only http and https are allowed</div>
+        </div>
+      `;
+    }
+    const escaped = this.escapeHtml(url);
     return `
       <div class="widget-frame-toolbar">
         <button class="widget-frame-btn frame-back" title="Back">◀</button>
         <button class="widget-frame-btn frame-forward" title="Forward">▶</button>
         <button class="widget-frame-btn frame-home" title="Home">⌂</button>
-        <span class="widget-frame-url" title="${url}">${url}</span>
+        <span class="widget-frame-url" title="${escaped}">${escaped}</span>
       </div>
-      <iframe class="widget-frame-iframe" src="${url}" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"></iframe>
+      <iframe class="widget-frame-iframe" src="${escaped}" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"></iframe>
     `;
   }
 
@@ -73,7 +91,7 @@ export class FrameWidget extends WidgetBase {
 
     homeBtn?.addEventListener('click', () => {
       const url = this.data.url || '';
-      if (url) {
+      if (url && FrameWidget.isSafeUrl(url)) {
         iframe.src = url;
       }
     });

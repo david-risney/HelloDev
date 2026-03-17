@@ -19,6 +19,54 @@ const REDIRECT_URI = chrome.identity.getRedirectURL();
 class GraphAuthHelper extends AuthHelperBase {
   static TOKEN_CACHE_KEY = 'graph_auth_token';
   static LOG_PREFIX = '[GraphAuthHelper]';
+  static REFRESH_TOKEN_SESSION_KEY = 'graph_refresh_token';
+
+  // --- Refresh token storage ---
+  // Store refresh tokens in chrome.storage.session (not localStorage) so they
+  // are not persisted to disk and are cleared when the browser session ends.
+
+  static async _getRefreshToken() {
+    try {
+      const result = await chrome.storage.session.get(this.REFRESH_TOKEN_SESSION_KEY);
+      return result[this.REFRESH_TOKEN_SESSION_KEY] || null;
+    } catch {
+      return null;
+    }
+  }
+
+  static async _setRefreshToken(token) {
+    try {
+      await chrome.storage.session.set({ [this.REFRESH_TOKEN_SESSION_KEY]: token });
+    } catch (e) {
+      console.error(`${this.LOG_PREFIX} Failed to save refresh token:`, e);
+    }
+  }
+
+  static async _clearRefreshToken() {
+    try {
+      await chrome.storage.session.remove(this.REFRESH_TOKEN_SESSION_KEY);
+    } catch {
+      // best-effort
+    }
+  }
+
+  /**
+   * Override cacheToken to store refresh tokens in chrome.storage.session
+   * while keeping access tokens in localStorage for synchronous reads.
+   */
+  static cacheToken(data) {
+    const { refreshToken, ...rest } = data;
+    super.cacheToken(rest);
+    if (refreshToken) {
+      this._setRefreshToken(refreshToken);
+    }
+  }
+
+  /** Override clearCache to also clear the session-stored refresh token. */
+  static clearCache() {
+    super.clearCache();
+    this._clearRefreshToken();
+  }
 
   /**
    * Acquire a fresh token. Tries silent refresh first, then interactive PKCE.
@@ -26,9 +74,9 @@ class GraphAuthHelper extends AuthHelperBase {
    */
   static async _acquireToken() {
     // Try silent refresh first if we have a refresh token
-    const cached = this.getCachedToken();
-    if (cached?.refreshToken) {
-      const refreshResult = await this.refreshAccessToken(cached.refreshToken);
+    const refreshToken = await this._getRefreshToken();
+    if (refreshToken) {
+      const refreshResult = await this.refreshAccessToken(refreshToken);
       if (refreshResult?.access_token) {
         const expiresOn = new Date(Date.now() + refreshResult.expires_in * 1000).toISOString();
         this.cacheToken({

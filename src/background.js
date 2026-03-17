@@ -18,7 +18,13 @@ const GITHUB_NATIVE_HOST_NAME = 'com.hellodev.github';
 // Handle messages from extension pages
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   console.log('[background] Received message:', request.type);
-  
+
+  // Only accept messages from our own extension pages
+  if (!sender.url?.startsWith(chrome.runtime.getURL(''))) {
+    console.warn('[background] Rejected message from untrusted sender:', sender.url);
+    return;
+  }
+
   if (request.type === 'ADO_GET_TOKEN') {
     console.log('[background] Getting ADO token from native host...');
     getNativeToken(ADO_NATIVE_HOST_NAME, request.resource).then(result => {
