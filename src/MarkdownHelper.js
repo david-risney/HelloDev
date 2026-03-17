@@ -123,6 +123,18 @@ export class MarkdownHelper {
   }
 
   /**
+   * Escape &, <, > so text is safe for parseInline (which only guards &).
+   * parseLine does this inline; list items need the same treatment.
+   * @private
+   */
+  static escapeForInline(text) {
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  /**
    * Parse a list starting at the given index
    * @private
    */
@@ -150,10 +162,10 @@ export class MarkdownHelper {
         const checkboxMatch = content.match(/^\[([ xX])\]\s*(.*)$/);
         if (checkboxMatch) {
           const checked = checkboxMatch[1].toLowerCase() === 'x';
-          content = `<input type="checkbox"${checked ? ' checked' : ''}> ` + this.parseInline(checkboxMatch[2]);
+          content = `<input type="checkbox"${checked ? ' checked' : ''}> ` + this.parseInline(this.escapeForInline(checkboxMatch[2]));
           hasCheckbox = true;
         } else {
-          content = this.parseInline(content);
+          content = this.parseInline(this.escapeForInline(content));
         }
         items.push({ content, children: null, hasCheckbox });
         i++;
@@ -242,8 +254,9 @@ export class MarkdownHelper {
             return text;
           }
         }
+        const safeUrl = url.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
         const attrs = url.startsWith('#') ? '' : ' target="_blank"';
-        return `<a href="${url}"${attrs}>${text}</a>`;
+        return `<a href="${safeUrl}"${attrs}>${text}</a>`;
       });
   }
 }
