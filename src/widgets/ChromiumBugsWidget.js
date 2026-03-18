@@ -269,7 +269,7 @@ export class ChromiumBugsWidget extends DataWidgetBase {
 
     return `
       <li class="ado-widget-item">
-        <a href="${item.url}" target="_blank" class="ado-widget-link" title="${title}">
+        <a href="${this.escapeHtml(item.url)}" target="_blank" class="ado-widget-link" title="${title}">
           <div class="ado-widget-avatar-container">
             <span class="ado-widget-avatar-initials">${initials}</span>
           </div>

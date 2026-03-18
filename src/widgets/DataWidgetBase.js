@@ -254,7 +254,7 @@ export class DataWidgetBase extends WidgetBase {
     const displayTitle = this.escapeHtml(this.data.title || this.getDefaultTitle());
     const titleUrl = this.getTitleUrl();
     const titleHtml = titleUrl
-      ? `<a href="${titleUrl}" target="_blank" class="ado-widget-title-link">${displayTitle}</a>`
+      ? `<a href="${this.escapeHtml(titleUrl)}" target="_blank" class="ado-widget-title-link">${displayTitle}</a>`
       : `<span class="ado-widget-title">${displayTitle}</span>`;
 
     let statusHtml = '';

@@ -212,7 +212,7 @@ export class ADOBugsWidget extends ADOWidgetBase {
 
     return `
       <li class="ado-widget-item ${stateClass}">
-        <a href="${item.url}" target="_blank" class="ado-widget-link" title="${this.escapeHtml(item.title)}">
+        <a href="${this.escapeHtml(item.url)}" target="_blank" class="ado-widget-link" title="${this.escapeHtml(item.title)}">
           <div class="ado-widget-avatar-container">
             ${avatarHtml}
           </div>

@@ -302,7 +302,7 @@ export class GitHubIssuesWidget extends DataWidgetBase {
 
     return `
       <li class="ado-widget-item ${stateClass}">
-        <a href="${url}" target="_blank" class="ado-widget-link" title="${title}">
+        <a href="${this.escapeHtml(url)}" target="_blank" class="ado-widget-link" title="${title}">
           <div class="ado-widget-avatar-container">
             ${avatarHtml}
           </div>

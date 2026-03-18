@@ -1,4 +1,5 @@
 import { WidgetBase } from './WidgetBase.js';
+import { escapeHtml } from '../htmlUtils.js';
 
 /**
  * Search widget - web search input with support for multiple search templates.
@@ -70,13 +71,13 @@ export class SearchWidget extends WidgetBase {
     const placeholder = active.placeholder || 'Search the web...';
 
     let html = '<div class="search-widget-bar">';
-    html += `<input type="text" class="search-input" placeholder="${placeholder}">`;
+    html += `<input type="text" class="search-input" placeholder="${escapeHtml(placeholder)}">`;
 
     if (templates.length > 1) {
       html += '<select class="search-template-select">';
       templates.forEach((t, i) => {
         const selected = i === (this.data.activeTemplate ?? 0) ? ' selected' : '';
-        const label = t.name || `Template ${i + 1}`;
+        const label = escapeHtml(t.name || `Template ${i + 1}`);
         html += `<option value="${i}"${selected}>${label}</option>`;
       });
       html += '</select>';
@@ -106,6 +107,12 @@ export class SearchWidget extends WidgetBase {
           const active = this._activeTemplate();
           const template = active.urlTemplate || SearchWidget.DEFAULT_URL_TEMPLATE;
           const searchUrl = template.replace('{query}', encodeURIComponent(input.value.trim()));
+          try {
+            const parsed = new URL(searchUrl);
+            if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return;
+          } catch {
+            return;
+          }
           window.location.href = searchUrl;
         }
       });

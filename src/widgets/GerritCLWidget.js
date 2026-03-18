@@ -311,7 +311,7 @@ export class GerritCLWidget extends DataWidgetBase {
 
     return `
       <li class="ado-widget-item">
-        <a href="${url}" target="_blank" class="ado-widget-link" title="${subject}">
+        <a href="${this.escapeHtml(url)}" target="_blank" class="ado-widget-link" title="${subject}">
           <div class="ado-widget-avatar-container">
             ${avatarHtml}
           </div>
