@@ -1,51 +1,109 @@
-# HelloDev - Browser Extension
+# HelloDev
 
-A simple browser extension that replaces the default new tab page with a clean, personalized experience.
+A customizable new-tab dashboard for Chromium browsers. HelloDev replaces the
+default new tab page with a widget-based workspace that surfaces pull requests,
+issues, code reviews, and more — right where you start every browsing session.
+
+![HelloDev new tab dashboard](docs/screenshot.png)
 
 ## Features
 
-- **Time-based greeting** - Displays "Good Morning", "Good Afternoon", or "Good Evening"
-- **Live clock** - Shows the current time, updated every second
-- **Quick search** - Search Google directly from the new tab page
-- **Beautiful design** - Clean gradient background with modern styling
+### Widget Dashboard
+Add, arrange, and resize widgets on a CSS-grid layout. Drag-and-drop
+repositioning and per-widget configuration let you build the dashboard that fits
+your workflow.
+
+**Built-in widgets:**
+
+| Widget | Description |
+|--------|-------------|
+| **Markdown** | Rich markdown notes with live preview |
+| **GitHub PRs** | Your open pull requests from GitHub |
+| **GitHub Issues** | Your assigned issues from GitHub |
+| **ADO PRs** | Azure DevOps pull request list |
+| **ADO Bugs** | Azure DevOps bug tracker |
+| **Gerrit CLs** | Gerrit code reviews (Chromium) |
+| **Chromium Bugs** | Chromium issue tracker |
+| **Links** | Custom link list |
+| **Frame** | Embedded iframe for any URL |
+| **Clock** | Live clock with date and time-based greeting |
+| **Search** | Configurable search bar with multiple engine templates |
+
+### Widget Packs
+Get started quickly with preconfigured pack templates:
+
+- **Starter Dashboard** — Clock, Search, and Markdown notes
+- **GitHub Dev** — PRs, Issues, and Search for a GitHub repo
+- **ADO Dev** — PRs, Bugs, and Search for an Azure DevOps project
+- **Chromium Dev** — Gerrit CLs, Chromium Bugs, and Search
+
+### Themes & Customization
+Built-in color presets plus custom primary/accent color pickers. Supports Auto, Light, and Dark modes — Auto follows your OS preference.
+
+### Data Portability
+Export your full dashboard configuration as JSON, import a saved layout, or
+reset to defaults. Dashboard state syncs across devices via `chrome.storage`.
+
+### Native Host Integration
+Optional native messaging host for secure token-based authentication with
+GitHub CLI and Azure DevOps, avoiding the need to paste personal access tokens
+into the browser.
 
 ## Installation
 
 ### Chrome / Edge
+
+Not yet available in browser extension stores - but coming in the future.
+
+Until then, you can load the extension in developer mode:
 
 1. Open `chrome://extensions` (Chrome) or `edge://extensions` (Edge)
 2. Enable **Developer mode** (toggle in top right)
 3. Click **Load unpacked**
 4. Select the `src` folder
 
-### Firefox
-
-Firefox uses a different manifest format. This extension is designed for Chromium-based browsers.
-
-## Usage
-
-After installation, open a new tab to see your custom new tab page. Type in the search box and press Enter to search Google.
+> This extension uses Manifest V3 and is designed for Chromium-based browsers.
 
 ## Project Structure
 
 ```
-├── src/                 # Extension package folder
-│   ├── manifest.json    # Extension configuration
-│   ├── hellodev.html    # Main page markup
-│   ├── hellodev.css     # Styles
-│   ├── hellodev.js      # JavaScript functionality
-│   └── icons/           # Extension icons (placeholder)
-├── README.md
-└── .github/
+src/
+├── manifest.json        # Extension manifest (MV3)
+├── hellodev.html        # Dashboard page
+├── hellodev.css         # Styles & theme variables
+├── hellodev.js          # Core dashboard orchestration
+├── widgets/             # Widget implementations
+│   ├── WidgetBase.js    #   Base class for all widgets
+│   ├── DataWidgetBase.js#   Base class for data-fetching widgets
+│   ├── ClockWidget.js   #   Clock & greeting
+│   ├── SearchWidget.js  #   Search bar
+│   └── ...              #   13 widgets total
+├── flyouts.js           # Toolbar flyout panels (add, customize, data, about)
+├── widgetConfig.js      # Per-widget configuration dialog
+├── widgetPacks.js       # Predefined widget pack templates
+├── dragDrop.js          # Drag-and-drop grid positioning
+├── theme.js             # Theming engine (auto/light/dark + colors)
+├── syncStorage.js       # Cross-device state sync
+├── icons/               # Extension icons
+└── native-host/         # Native messaging host installer
+tests/
+├── unit/                # Vitest unit tests
+└── e2e/                 # Playwright end-to-end tests
 ```
 
-## Customization
-
-- **Colors**: Edit the gradient in `hellodev.css` (body background)
-- **Search engine**: Change the URL in `hellodev.js` `handleSearch` function
-- **Features**: Add widgets or links in `hellodev.html`
-
 ## Development & Testing
+
+### Unit Tests
+
+```sh
+npx vitest run
+```
+
+### End-to-End Tests
+
+```sh
+npx playwright test
+```
 
 ### Validating with Chrome DevTools MCP
 
@@ -71,12 +129,3 @@ Copilot can launch a browser, install the extension, and verify it works.
 
 See [`.github/copilot-instructions.md`](.github/copilot-instructions.md) for the
 full checklist Copilot follows automatically.
-
-## Icons
-
-The `icons/` folder requires PNG icons at these sizes:
-- `icon16.png` (16x16)
-- `icon48.png` (48x48)  
-- `icon128.png` (128x128)
-
-> **Note**: Icons are placeholders. Replace with your own icons before publishing.
