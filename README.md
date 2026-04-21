@@ -49,13 +49,33 @@ Optional native messaging host for secure token-based authentication with
 GitHub CLI and Azure DevOps, avoiding the need to paste personal access tokens
 into the browser.
 
+## Build
+
+HelloDev is loaded directly from the `src` folder, so there is no bundling or
+compile step required.
+
+For a local development setup:
+
+1. Install dependencies:
+
+   ```sh
+   npm ci
+   ```
+
+2. (Optional) Run unit tests:
+
+   ```sh
+   npm run test:run
+   ```
+
 ## Installation
 
 ### Chrome / Edge
 
 Not yet available in browser extension stores - but coming in the future.
 
-Until then, you can load the extension in developer mode:
+After completing the [Build](#build) steps above, you can load the extension in
+developer mode:
 
 1. Open `chrome://extensions` (Chrome) or `edge://extensions` (Edge)
 2. Enable **Developer mode** (toggle in top right)
