@@ -1,5 +1,26 @@
 # Copilot Instructions for HelloDev
 
+## Reproducible validation
+
+Run `npm ci`, then `npx playwright install chromium` when the test browser is
+missing. Use `npm run test:all` for unit and deterministic extension tests,
+and `npm run test:browser` for the Chrome DevTools MCP checklist below.
+The latter discovers/calls the real MCP tools and saves console, accessibility
+snapshot, screenshot and manifest-warning artifacts under
+`browser-artifacts\chrome-mcp`. Inspect the screenshot after UI changes.
+
+Both runners use fresh headless profiles. Never attach these checks to the
+user's normal browser or silently register/overwrite a native host.
+`HELLODEV_BROWSER_PATH` overrides the executable; otherwise the script uses
+Playwright's bundled Chromium.
+
+Work widgets use `com.devdash.cli`, normalized common fields plus `providerData`,
+and profile/query references. Provider authentication, filtering and cache
+freshness belong to DevDash. Do not restore browser-side tokens/provider fetches,
+add STALE labels or require an event/subscription protocol.
+The optional `DEVDASH_CHECKOUT` live test uses isolated public GitHub queries;
+deterministic fixtures must not require personal credentials.
+
 ## Validating the Extension with Chrome DevTools MCP
 
 After making changes to the extension, use the **Chrome DevTools MCP** to validate

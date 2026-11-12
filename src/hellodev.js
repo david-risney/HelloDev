@@ -129,7 +129,20 @@ function showStorageError(message) {
 
 // Apply a loaded state object to the in-memory state
 function applyLoadedState(loaded) {
+  destroyAllWidgets();
   state.widgets = (loaded.widgets || []).map(config => createWidget(config));
+  const widgets = state.widgets.map(widget => widget.toJSON());
+  if (JSON.stringify(widgets) !== JSON.stringify(loaded.widgets)) {
+    loaded.widgets = widgets;
+    loaded.lastModified = Date.now();
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(loaded));
+    } catch (error) {
+      console.error('Failed to migrate dashboard:', error);
+      showStorageError('Could not save the migrated layout. Export it before closing this tab.');
+    }
+    void saveToSync(loaded);
+  }
   state.currentTheme = {
     colorPrimary: loaded.colorPrimary || DEFAULT_STATE.colorPrimary,
     colorAccent: loaded.colorAccent || DEFAULT_STATE.colorAccent,
@@ -431,6 +444,8 @@ function toggleEditMode() {
   editToggle.classList.toggle('active', state.editMode);
   editToggle.querySelector('.edit-icon').textContent = state.editMode ? '\u2716' : '\u2630';
   editToggle.title = state.editMode ? 'Done' : 'Menu';
+  editToggle.setAttribute('aria-label', editToggle.title);
+  editToggle.setAttribute('aria-expanded', String(state.editMode));
   dashboard.classList.toggle('edit-mode', state.editMode);
 
   addWidgetBtn.classList.toggle('visible', state.editMode);

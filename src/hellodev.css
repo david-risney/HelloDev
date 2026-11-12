@@ -3435,3 +3435,52 @@ select option {
   background: var(--bg-widget, #1e1e2e);
   color: var(--text-primary);
 }
+/* DevDash owns queries and freshness; this component owns presentation. */
+.devdash-widget {
+  container-type: inline-size;
+  padding: 1rem;
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+
+  h2 { margin: 0; font-size: 1rem; }
+  a { color: var(--color-accent); }
+  button {
+    font: inherit;
+    cursor: pointer;
+    color: inherit;
+    background: transparent;
+    border: 1px solid currentColor;
+    border-radius: 0.35rem;
+    padding: 0.3rem 0.55rem;
+  }
+  button:hover { background: hsl(from var(--color-accent) h s l / 0.18); }
+  button:disabled { cursor: wait; }
+  :focus-visible { outline: 2px solid var(--color-accent); outline-offset: 3px; }
+
+  .devdash-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    h2 { flex: 1 1 10rem; }
+  }
+
+  .devdash-status, .devdash-item-meta { opacity: 0.8; }
+  .devdash-items { list-style: none; padding: 0; margin: 0; }
+  .devdash-item { padding-block: 0.75rem; border-block-end: 1px solid currentColor; }
+  .devdash-item-heading { display: flex; gap: 0.5rem; align-items: baseline; }
+  .devdash-item-heading a { flex-shrink: 0; }
+  .devdash-item-meta { display: flex; flex-wrap: wrap; gap: 0.25rem 0.75rem; margin-block: 0.25rem; }
+  details { margin-block-start: 0.5rem; }
+  summary { cursor: pointer; }
+  dl { display: grid; grid-template-columns: auto 1fr; gap: 0.25rem 1rem; }
+  dd { margin: 0; }
+  pre { white-space: pre-wrap; max-block-size: 12rem; overflow: auto; }
+  .devdash-error { border: 1px solid currentColor; padding: 0.75rem; }
+  .devdash-warning { font-weight: bold; }
+
+  .devdash-table-scroll { overflow: auto; max-inline-size: 100%; max-block-size: min(50vh, 24rem); }
+  table { border-collapse: separate; border-spacing: 0; inline-size: 100%; }
+  th, td { padding: 0.5rem; text-align: start; vertical-align: top; border-block-end: 1px solid currentColor; }
+  thead { position: sticky; inset-block-start: 0; background: var(--color-primary); z-index: 1; }
+}

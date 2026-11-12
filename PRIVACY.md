@@ -1,57 +1,62 @@
 # Privacy Policy
 
-**Last updated:** February 8, 2026
+**Last updated:** November 12, 2026
 
-## Overview
+HelloDev has no analytics or developer-operated collection server. It processes
+the data needed for the widgets you choose; it is not accurate to say that all
+dashboard data always stays on one device.
 
-HelloDev is a browser extension that provides a customizable developer dashboard. It intends to protect your privacy and be transparent about data practices.
+## Settings and browser sync
 
-## Data Collection
+Layouts, themes, notes, links and widget configurations are stored in browser
+local storage and replicated through `chrome.storage.sync` when browser sync is
+available. Your browser/account controls that service. Do not put secrets in
+notes or other synced settings. Current work-widget configuration contains
+DevDash profile/query references and display preferences, not provider tokens
+or a copy of the provider query.
 
-**HelloDev does not collect any personal information.** All your settings, widget configurations, and preferences are stored locally in your browser and are never transmitted to any server.
+## Developer work queries
 
-## Third-Party Services
+Bug, PR and CL widgets communicate with the locally installed DevDash native
+host (`com.devdash.cli`). DevDash uses its configured provider tools and their
+credentials to contact GitHub, Azure DevOps or Chromium services, and owns its
+local result caches and diagnostics. HelloDev receives normalized query
+results, which can include private titles, identities and provider metadata.
+These results are held in the page for display, not written to browser sync.
+HelloDev does not acquire provider credentials for these work widgets.
+DevDash is separately installed and configured by you.
 
-Some widgets in HelloDev may contact third-party servers to implement their functionality. These connections are made only when you create or use the widget and are necessary to perform the widget's intended function. HelloDev does not send any additional data beyond what is required for the widget to function.
+Refreshing a shared query updates the cache other DevDash consumers use.
+Removing the extension does not remove DevDash's data, profiles or native-host
+registration. Manage those through DevDash.
 
-The following third-party services may be accessed by widgets:
+## Other widgets and navigation
 
-### Azure DevOps
-Used by the Azure DevOps Pull Request widget to display your pull requests and work items.
-- [Azure DevOps Privacy Policy](https://privacy.microsoft.com/en-us/privacystatement)
+Links widgets can read top sites and recently closed tabs through browser APIs
+when configured. Search and link actions navigate to their configured services.
+Embedded pages, Markdown images and other remote content can contact the
+origins you select, whose own privacy policies apply. HelloDev does not load a
+remote font for its own UI.
 
-### GitHub
-Used by widgets that integrate with GitHub repositories, issues, or pull requests.
-- [GitHub Privacy Statement](https://docs.github.com/en/site-policy/privacy-policies/github-privacy-statement)
+Provider policies include
+[GitHub](https://docs.github.com/en/site-policy/privacy-policies/github-privacy-statement),
+[Microsoft](https://privacy.microsoft.com/en-us/privacystatement) and
+[Google](https://policies.google.com/privacy).
 
-### Chromium Code Search (cs.chromium.org)
-Used by widgets that search or browse the Chromium source code.
-- [Google Privacy Policy](https://policies.google.com/privacy)
+## Migration and control
 
-### Chromium Bug Tracking (bugs.chromium.org)
-Used by widgets that display or interact with Chromium project issues.
-- [Google Privacy Policy](https://policies.google.com/privacy)
+The current migration removes old provider credentials/settings from loaded
+work-widget configurations. It does not erase historical exports, browser-sync
+history, old auth caches or previously installed native hosts. Delete sensitive
+historical data separately and revoke tokens if they were exposed.
 
-## Local Storage
+You can export/import or clear the current layout in Manage Data, clear browser
+site/extension storage, change browser-sync settings, remove widgets or
+uninstall HelloDev. Clearing the layout alone is not a secure erase of all
+browser data. Automated fixture tests use isolated profiles and synthetic data.
+The optional live test queries only this project's public GitHub data.
 
-HelloDev uses your browser's local storage to save:
-- Widget layout and configurations
-- Theme and appearance preferences
-- Widget-specific data (such as notes or saved content)
+Copilot integration is a design proposal, not an enabled feature. HelloDev
+currently does not send dashboard content to Copilot.
 
-This data remains on your device and is not transmitted to any external servers.
-
-## Your Control
-
-You have full control over your data:
-- Clear your browser's local storage to remove all HelloDev data
-- Disable or remove widgets that connect to third-party services
-- Uninstall the extension at any time to remove all associated data
-
-## Changes to This Policy
-
-We may update this privacy policy from time to time. Any changes will be reflected in the "Last updated" date at the top of this document.
-
-## Contact
-
-If you have questions or concerns about this privacy policy, please [open an issue on GitHub](https://github.com/david-risney/HelloDev/issues).
+Questions: [open an issue](https://github.com/david-risney/HelloDev/issues).

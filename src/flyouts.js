@@ -408,30 +408,29 @@ export async function showAboutFlyout() {
 
 // Show Native Host Setup flyout
 export function showSetupFlyout(parentEl) {
-  const extensionId = chrome.runtime?.id || 'nhfaibfkboppjdaiiaocmdkahcmglgbh';
-  const scriptUrl = 'https://raw.githubusercontent.com/david-risney/HelloDev/main/src/native-host/install.ps1';
-  const installCmd = extensionId !== 'nhfaibfkboppjdaiiaocmdkahcmglgbh'
-    ? `& ([scriptblock]::Create((irm '${scriptUrl}'))) -ExtensionId "${extensionId}"`
-    : `iex (irm '${scriptUrl}')`;
+  const extensionId = chrome.runtime.id;
+  const installCmd = `.\\scripts\\install-native-host.ps1 -ExtensionId ${extensionId} -Browser Both`;
 
   createFlyout({
     id: 'setupFlyout',
     parentEl: parentEl || buttonEls.aboutBtn,
-    title: 'Native Host Setup',
+    title: 'DevDash Setup',
     dialogClass: 'setup-dialog',
     contentHtml: `
       <div class="setup-section">
         <p class="setup-description">
-          The native host lets HelloDev get auth tokens from your local
-          <strong>Azure CLI</strong> and <strong>GitHub CLI</strong>, enabling
-          ADO and GitHub widgets.
+          HelloDev reads shared bug, PR and CL queries from
+          <a href="https://github.com/david-risney/DevDash" target="_blank" rel="noopener noreferrer">DevDash</a>.
+          Credentials stay with its provider tools, not your dashboard.
+          Clone DevDash, review its installer, then run this command from that checkout.
+          This registers <code>com.devdash.cli</code> for this extension's exact ID.
         </p>
 
         <div class="setup-steps">
           <div class="setup-step">
             <div class="setup-step-header">
               <span class="setup-step-number">1</span>
-              <span>Run in PowerShell</span>
+              <span>Run in PowerShell from the DevDash checkout (Node 22+)</span>
             </div>
             <div class="setup-command-block">
               <code class="setup-command" id="setupCommand">${escapeHtml(installCmd)}</code>
@@ -447,9 +446,12 @@ export function showSetupFlyout(parentEl) {
             <button class="setup-verify-btn" id="setupVerifyBtn">
               <span>Check Connection</span>
             </button>
-            <span class="setup-verify-result" id="setupVerifyResult"></span>
+            <span class="setup-verify-result" id="setupVerifyResult" role="status"></span>
           </div>
         </div>
+        <p>Run <code>devdash doctor</code> and configure profiles in DevDash.
+          In each widget, select a profile and (for grouped profiles) a named query.
+          A connection check does not verify provider sign-in.</p>
       </div>
     `,
     onSetup(flyout) {
@@ -482,14 +484,14 @@ export function showSetupFlyout(parentEl) {
         try {
           const result = await chrome.runtime.sendMessage({ type: 'PROBE_NATIVE_HOST' });
           if (result && result.installed) {
-            resultEl.textContent = '✅ Connected!';
+            resultEl.textContent = '✅ DevDash connected (provider sign-in not checked)';
             resultEl.classList.add('setup-verify-success');
             // Mark as successfully set up so auto-open doesn't recur
             try {
               chrome.storage.local.set({ nativeHostSetupDismissed: true });
             } catch (_) { /* best-effort */ }
           } else {
-            resultEl.textContent = '❌ Not detected. Did you run the script?';
+            resultEl.textContent = '❌ DevDash not detected. Register this extension ID, then retry.';
             resultEl.classList.add('setup-verify-error');
           }
         } catch (err) {

@@ -33,12 +33,12 @@ export const DEFAULT_STATE = {
   {
     id: 'widget-default-2',
     type: 'clock',
-    x: 8,
-    y: 0,
-    width: 3,
-    height: 2,
+    x: 7,
+    y: 1,
+    width: 4,
+    height: 3,
     zIndex: 1,
-    stretchFill: true,
+    stretchFill: false,
     data: {
       name: '',
       style: 'Classic'
@@ -60,6 +60,7 @@ export const DEFAULT_STATE = {
 
 - [ ] Use the **[\u2630 menu](#action=edit)** in the top-right to enter edit mode
 - [ ] Add **packs** of widgets: [ADO](#action=add&name=ADO+Dev), [Chromium](#action=add&name=Chromium+Dev), [GitHub](#action=add&name=GitHub+Dev)
+- [ ] [Connect DevDash](#action=setup), then select a shared profile/query in each work widget
 - [ ] Or **[add widgets](#action=add)** one off with the \u2795 button
 - [ ] Each widget can be moved \u2725, resized \u2922 and configured \u2699
 - [ ] Personalize your dashboard **[appearance](#action=appearance)**

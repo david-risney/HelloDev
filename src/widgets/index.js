@@ -1,4 +1,5 @@
 export { WidgetBase } from './WidgetBase.js';
+export { DevDashWidget } from './DevDashWidget.js';
 export { ClockWidget } from './ClockWidget.js';
 export { SearchWidget } from './SearchWidget.js';
 export { MarkdownWidget } from './MarkdownWidget.js';
@@ -14,6 +15,7 @@ export { LinksWidget } from './LinksWidget.js';
 // export { DevBoxWidget } from './DevBoxWidget.js';
 
 import { WidgetBase } from './WidgetBase.js';
+import { DevDashWidget } from './DevDashWidget.js';
 import { ClockWidget } from './ClockWidget.js';
 import { SearchWidget } from './SearchWidget.js';
 import { MarkdownWidget } from './MarkdownWidget.js';
@@ -30,6 +32,7 @@ import { LinksWidget } from './LinksWidget.js';
 
 // Widget factory - creates the appropriate widget class instance
 export const WidgetRegistry = {
+  devdash: DevDashWidget,
   clock: ClockWidget,
   search: SearchWidget,
   markdown: MarkdownWidget,

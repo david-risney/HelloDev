@@ -368,7 +368,7 @@ export class WidgetBase {
       <button class="widget-control drag-handle" title="Drag to move">✥</button>
       <button class="widget-control minimize" title="${this.minimized ? 'Restore' : 'Minimize'}">${this.minimized ? '\u25A3' : '\u2581'}</button>
       <button class="widget-control maximize" title="Maximize">⛶</button>
-      <button class="widget-control config" title="Configure">⚙</button>
+      <button class="widget-control config" title="Configure" aria-label="Configure">⚙</button>
       <button class="widget-control resize-handle" title="Drag to resize">⤢</button>
       <div class="widget-content">
         ${this.getContent()}

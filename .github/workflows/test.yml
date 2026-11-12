@@ -51,26 +51,22 @@ jobs:
         run: npm ci
 
       - name: Install Playwright browsers
-        run: npx playwright install chromium
-
-      - name: Start Xvfb
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get install -y xvfb
-          Xvfb :99 -screen 0 1920x1080x24 &
+        run: npx playwright install --with-deps chromium
 
       - name: Run E2E tests
         run: npm run test:e2e
-        env:
-          # Extensions require headed mode; use xvfb on Linux
-          DISPLAY: ':99'
+
+      - name: Validate with Chrome DevTools MCP
+        run: npm run test:browser
 
       - name: Upload E2E screenshots
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: e2e-screenshots
-          path: tests/e2e/screenshots/
+          path: |
+            test-results/
+            browser-artifacts/
 
       - name: Upload Playwright report
         if: always()

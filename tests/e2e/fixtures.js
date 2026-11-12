@@ -1,86 +1,63 @@
-// Playwright fixtures for testing the HelloDev Chrome extension.
-// Launches a persistent browser context with the extension loaded.
-
 import { test as base, chromium } from '@playwright/test';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import { existsSync } from 'fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const extensionPath = path.resolve(__dirname, '../../src');
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
-/**
- * Find a Chromium-based browser executable.
- * Prefers Edge Dev > Edge Stable > Playwright's bundled Chromium.
- */
-function findBrowserExecutable() {
-  const candidates = [
-    // Edge Dev
-    process.env.EDGE_DEV_PATH,
-    'C:\\Program Files (x86)\\Microsoft\\Edge Dev\\Application\\msedge.exe',
-    path.join(process.env.LOCALAPPDATA || '', 'Microsoft', 'Edge Dev', 'Application', 'msedge.exe'),
-    // Edge Stable
-    'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
-    path.join(process.env.LOCALAPPDATA || '', 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
-    // Linux/macOS Edge
-    '/usr/bin/microsoft-edge',
-    '/usr/bin/microsoft-edge-dev',
-    // Linux Chromium/Chrome fallbacks
-    '/usr/bin/chromium-browser',
-    '/usr/bin/google-chrome',
-  ];
-
-  for (const p of candidates) {
-    if (p && existsSync(p)) return p;
-  }
-  return undefined; // Fall back to Playwright's bundled Chromium
-}
-
-/**
- * Custom fixture that provides:
- * - context: a persistent BrowserContext with the extension loaded
- * - extensionId: the extension's ID (derived from service worker URL)
- */
 export const test = base.extend({
-  // eslint-disable-next-line no-empty-pattern
   context: async ({}, use) => {
-    const executablePath = findBrowserExecutable();
+    const executablePath = process.env.HELLODEV_BROWSER_PATH || process.env.EDGE_DEV_PATH;
     const context = await chromium.launchPersistentContext('', {
-      headless: false, // Extensions require headed mode
+      channel: 'chromium',
+      headless: process.env.HELLODEV_HEADED !== '1',
       ...(executablePath ? { executablePath } : {}),
-      channel: executablePath ? undefined : 'msedge',
+      viewport: { width: 1280, height: 800 },
       args: [
-        `--disable-extensions-except=${extensionPath}`,
-        `--load-extension=${extensionPath}`,
+        `--disable-extensions-except=${path.join(root, 'src')}`,
+        `--load-extension=${path.join(root, 'src')}`,
         '--no-first-run',
         '--disable-default-apps'
       ]
     });
-
-    await use(context);
-    await context.close();
+    try { await use(context); } finally { await context.close(); }
   },
-
   extensionId: async ({ context }, use) => {
-    // Wait for the service worker to register so we can extract the extension ID
-    let swURL;
-    const existingWorkers = context.serviceWorkers();
-    if (existingWorkers.length > 0) {
-      swURL = existingWorkers[0].url();
-    } else {
-      const sw = await context.waitForEvent('serviceworker');
-      swURL = sw.url();
-    }
-
-    // URL format: chrome-extension://<id>/background.js
-    const match = swURL.match(/chrome-extension:\/\/([^/]+)/);
-    const extensionId = match?.[1];
-    if (!extensionId) {
-      throw new Error(`Could not extract extension ID from service worker URL: ${swURL}`);
-    }
-
-    await use(extensionId);
+    const worker = context.serviceWorkers()[0] || await context.waitForEvent('serviceworker');
+    await use(new URL(worker.url()).host);
   }
 });
+
+export async function openDashboard(page, extensionId) {
+  await page.goto(`chrome-extension://${extensionId}/hellodev.html`);
+  await page.locator('.widget').first().waitFor();
+}
+
+// Fixtures exercise the real extension UI without provider credentials or registry changes.
+export async function mockDevDash(page, responses, widgets) {
+  await page.addInitScript(({ responses, widgets }) => {
+    if (location.protocol !== 'chrome-extension:') return;
+    window.devdashRequests = [];
+    chrome.runtime.sendMessage = async () => ({ installed: true });
+    chrome.runtime.connectNative = name => {
+      if (name !== 'com.devdash.cli') throw new Error('Unexpected native host');
+      let receive;
+      return {
+        onMessage: { addListener: listener => { receive = listener; } },
+        onDisconnect: { addListener() {} },
+        disconnect() {},
+        postMessage(request) {
+          window.devdashRequests.push(request);
+          const response = responses[Math.min(window.devdashRequests.length - 1, responses.length - 1)];
+          queueMicrotask(() => receive(response));
+        }
+      };
+    };
+    if (widgets) {
+      localStorage.setItem('hellodev-widgets', JSON.stringify({
+        version: 1, widgets, themeMode: 'dark', lastModified: Date.now()
+      }));
+    }
+  }, { responses, widgets });
+}
 
 export { expect } from '@playwright/test';
