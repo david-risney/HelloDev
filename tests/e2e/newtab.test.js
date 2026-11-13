@@ -23,6 +23,21 @@ test('default dashboard has greeting, clock, onboarding, toolbar and controls wi
   expect(errors).toEqual([]);
 });
 
+test('DevDash setup uses the current CLI with this extension ID', async ({ context, extensionId }, testInfo) => {
+  const page = await context.newPage();
+  await mockDevDash(page, []);
+  await openDashboard(page, extensionId);
+  await page.getByRole('button', { name: 'Menu', exact: true }).click();
+  await page.getByRole('button', { name: 'DevDash Setup', exact: true }).click();
+  await expect(page.locator('#setupCommand')).toHaveText(
+    `devdash native install --browser both --extension-id ${extensionId}`
+  );
+  await expect(page.locator('#setupFlyout')).not.toContainText('install-native-host.ps1');
+  await expect(page.locator('#setupFlyout')).toContainText('.\\devdash.ps1');
+  await expect(page.locator('#setupFlyout')).toContainText('same computer as your browser');
+  await page.screenshot({ path: testInfo.outputPath('devdash-setup.png'), fullPage: true });
+});
+
 const row = (id, provider = 'github', kind = 'pr') => ({
   provider, kind, id, title: `Fixture ${provider} ${id}`, state: 'open',
   url: `https://example.com/items/${id}`, repository: 'sample/repo', author: 'Fixture Author',

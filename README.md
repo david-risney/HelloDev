@@ -61,16 +61,23 @@ Open `edge://extensions` or `chrome://extensions`, enable Developer mode, choose
 **Load unpacked**, and select `src`. The extension is Manifest V3 and supports
 Chromium-based browsers, not Firefox.
 
-For work widgets, clone/update DevDash and follow its native-host installation
-instructions. From the **DevDash checkout**, register your exact extension ID:
+For work widgets, update DevDash and follow its native-host installation
+instructions. On the same computer as the browser, use its CLI to register
+your exact extension ID:
 
 ```powershell
-.\scripts\install-native-host.ps1 -ExtensionId YOUR_32_CHARACTER_EXTENSION_ID -Browser Both
+devdash native install --browser both --extension-id YOUR_32_CHARACTER_EXTENSION_ID
+devdash native status
 ```
 
 The **DevDash Setup** panel displays the command with your actual ID and can
-check the connection. Review the local installer before running it. HelloDev
-no longer downloads and executes a remote installation script.
+check the connection. From a DevDash source checkout, use `.\devdash.ps1`
+instead of `devdash` if the command is not installed globally.
+Installation preserves existing allowed extension IDs. To authorize another
+copy without reinstalling an existing host, use
+`devdash native extensions add YOUR_32_CHARACTER_EXTENSION_ID`.
+Native-host administration is CLI-only; HelloDev never downloads and executes
+a remote installation script or changes the allowlist itself.
 The old HelloDev token-host installers are not the DevDash setup path.
 
 Configure profiles/queries and provider login in DevDash. Add a **DevDash Query**

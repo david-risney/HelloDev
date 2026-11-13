@@ -409,7 +409,7 @@ export async function showAboutFlyout() {
 // Show Native Host Setup flyout
 export function showSetupFlyout(parentEl) {
   const extensionId = chrome.runtime.id;
-  const installCmd = `.\\scripts\\install-native-host.ps1 -ExtensionId ${extensionId} -Browser Both`;
+  const installCmd = `devdash native install --browser both --extension-id ${extensionId}`;
 
   createFlyout({
     id: 'setupFlyout',
@@ -422,15 +422,16 @@ export function showSetupFlyout(parentEl) {
           HelloDev reads shared bug, PR and CL queries from
           <a href="https://github.com/david-risney/DevDash" target="_blank" rel="noopener noreferrer">DevDash</a>.
           Credentials stay with its provider tools, not your dashboard.
-          Clone DevDash, review its installer, then run this command from that checkout.
-          This registers <code>com.devdash.cli</code> for this extension's exact ID.
+          Update DevDash, then run this command in PowerShell on the same computer as your browser.
+          This registers <code>com.devdash.cli</code> for this extension's exact ID
+          while preserving other allowed extension IDs.
         </p>
 
         <div class="setup-steps">
           <div class="setup-step">
             <div class="setup-step-header">
               <span class="setup-step-number">1</span>
-              <span>Run in PowerShell from the DevDash checkout (Node 22+)</span>
+              <span>Run in PowerShell with the updated DevDash CLI (Node 22+)</span>
             </div>
             <div class="setup-command-block">
               <code class="setup-command" id="setupCommand">${escapeHtml(installCmd)}</code>
@@ -449,7 +450,9 @@ export function showSetupFlyout(parentEl) {
             <span class="setup-verify-result" id="setupVerifyResult" role="status"></span>
           </div>
         </div>
-        <p>Run <code>devdash doctor</code> and configure profiles in DevDash.
+        <p class="setup-description">From the DevDash source checkout, replace <code>devdash</code> with
+          <code>.\\devdash.ps1</code>; a global CLI installation is not required.</p>
+        <p class="setup-description">Run <code>devdash doctor</code> and configure profiles in DevDash.
           In each widget, select a profile and (for grouped profiles) a named query.
           A connection check does not verify provider sign-in.</p>
       </div>

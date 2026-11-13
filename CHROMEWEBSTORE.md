@@ -82,7 +82,7 @@ no public contact email is inferred.
 
 | Version | Date | Changes | Status |
 | --- | --- | --- | --- |
-| 1.0.0 development | 2026-11-12 | DevDash work widgets, fewer permissions, isolated browser validation, new-user layout cleanup | Unreleased working tree |
+| 1.0.0 development | 2026-11-12 | DevDash work widgets, CLI-based connection setup, fewer permissions, isolated browser validation, new-user layout cleanup | Unreleased testing branch |
 
 ## Review notes
 
